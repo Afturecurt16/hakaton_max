@@ -5,16 +5,32 @@ import { getPartner, getPartnerDepartment, getPartners } from '../services/api.j
 
 function partnerCard(partner, index) {
   const departments = Number(partner.departmentCount || 0);
+  const children = Number(partner.childCount || 0);
   return `
     <article class="partner-card" style="--i:${index}">
       ${companyLogo(partner)}
       <div class="partner-card-copy">
         <h2>${escapeHtml(partner.name)}</h2>
         <p>${escapeHtml(partner.description)}</p>
-        <span>${departments} ${departments === 1 ? 'департамент' : departments > 1 && departments < 5 ? 'департамента' : 'департаментов'}</span>
+        <span>${children ? `${children} ${children === 1 ? 'компания' : children > 1 && children < 5 ? 'компании' : 'компаний'} · ` : ''}${departments} ${departments === 1 ? 'департамент' : departments > 1 && departments < 5 ? 'департамента' : 'департаментов'}</span>
       </div>
       <span class="partner-card-arrow">${icons.arrowRight}</span>
       <button class="card-hit partner-card-hit" type="button" data-action="navigate" data-route="/partners/${escapeHtml(partner.id)}" aria-label="Открыть карточку компании ${escapeHtml(partner.name)}"></button>
+    </article>`;
+}
+
+function childCompanyCard(parentId, company, index) {
+  const departments = Number(company.departmentCount || 0);
+  return `
+    <article class="partner-card partner-child-card" style="--i:${index}">
+      ${companyLogo(company)}
+      <div class="partner-card-copy">
+        <h2>${escapeHtml(company.name)}</h2>
+        <p>${escapeHtml(company.description)}</p>
+        <span>${departments} ${departments === 1 ? 'департамент' : departments > 1 && departments < 5 ? 'департамента' : 'департаментов'}</span>
+      </div>
+      <span class="partner-card-arrow">${icons.arrowRight}</span>
+      <button class="card-hit partner-card-hit" type="button" data-action="navigate" data-route="/partners/${escapeHtml(company.id)}" aria-label="Открыть компанию ${escapeHtml(company.name)} внутри ${escapeHtml(parentId)}"></button>
     </article>`;
 }
 
@@ -58,7 +74,7 @@ export async function renderPartnerDetail(id) {
       `
       <header class="partner-detail-head">
         ${iconButton('Назад', icons.back, { action: 'back', className: 'partner-back' })}
-        <span>Компания-партнер</span>
+        <span>${partner.parentName ? `${escapeHtml(partner.parentName)} · ` : ''}Компания-партнер</span>
       </header>
       <article class="partner-identity">
         ${companyLogo(partner, 'large')}
@@ -73,6 +89,14 @@ export async function renderPartnerDetail(id) {
           <span class="section-icon">${icons.star}</span>
           <h2>Заслуги и достижения</h2>
           <p>${escapeHtml(partner.achievements)}</p>
+        </section>` : ''}
+      ${partner.children?.length ? `
+        <section class="partner-departments partner-child-companies">
+          <div class="section-heading">
+            <h2>Компании и проекты</h2>
+            <span>${partner.children.length}</span>
+          </div>
+          <div class="partner-list">${partner.children.map((item, index) => childCompanyCard(partner.name, item, index)).join('')}</div>
         </section>` : ''}
       <section class="partner-departments">
         <div class="section-heading">

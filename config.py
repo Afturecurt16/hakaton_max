@@ -28,33 +28,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _env_channel_username(name: str, default: str = "") -> str:
-    """Normalize channel username for Telegram API calls."""
-    value = os.getenv(name, default).strip()
-    if not value:
-        return ""
-    if value.startswith("https://t.me/"):
-        value = value.removeprefix("https://t.me/").strip("/")
-    if value.startswith("http://t.me/"):
-        value = value.removeprefix("http://t.me/").strip("/")
-    if value.startswith("@") or value.lstrip("-").isdigit():
-        return value
-    return f"@{value}"
-
-# Telegram Bot
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(","))) if os.getenv("ADMIN_IDS") else []
-AUTO_RESTART_ENABLED = _env_bool("AUTO_RESTART_ENABLED", default=True)
-AUTO_RESTART_DELAY_SECONDS = max(1, _env_int("AUTO_RESTART_DELAY_SECONDS", default=5))
-REQUIRED_CHANNEL_USERNAME = _env_channel_username("REQUIRED_CHANNEL_USERNAME", "@kvskeepintouch")
-REQUIRED_CHANNEL_URL = os.getenv(
-    "REQUIRED_CHANNEL_URL",
-    f"https://t.me/{REQUIRED_CHANNEL_USERNAME.lstrip('@')}" if REQUIRED_CHANNEL_USERNAME else ""
-)
-
-# MAX bot and mini app. Keep this token separate from BOT_TOKEN: using a
-# Telegram token against MAX would make both initData validation and delivery
-# fail in a way that is needlessly hard to diagnose.
+# MAX bot and mini app.
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 MAX_ADMIN_IDS = (
     list(map(int, os.getenv("MAX_ADMIN_IDS", "").split(",")))

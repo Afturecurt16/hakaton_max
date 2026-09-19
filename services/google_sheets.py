@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import logging
@@ -6,7 +8,7 @@ import sys
 import gspread
 from google.oauth2.service_account import Credentials
 from config import EVENTS_GOOGLE_SHEETS_URL, GOOGLE_CREDENTIALS_FILE, GOOGLE_SHEET_NAME, GOOGLE_SHEETS_URL, VACANCY_SYNC_ALLOW_EMPTY
-from database.models import Vacancy, Company, Division, Event, EventRegistration, User
+from database.models import Vacancy, Company, Division
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
 from services.image_generator import sync_vacancy_image_cache
@@ -897,7 +899,7 @@ async def sync_vacancies_to_db_with_stats(
         cache_stats = await sync_vacancy_image_cache()
         logger.info("Vacancy image cache refreshed after database sync: %s", cache_stats)
     except Exception:
-        # Image cards are a secondary Telegram optimization. Their failure
+        # Image cards are a secondary presentation optimization. Their failure
         # must not roll back the already committed SQL snapshot.
         logger.exception("Vacancies updated, but image cache refresh failed")
 

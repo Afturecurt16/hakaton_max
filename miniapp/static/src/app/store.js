@@ -46,6 +46,7 @@ function emptyPartnerDraft() {
     logo: '',
     description: '',
     achievements: '',
+    parentId: '',
     isActive: true,
     departments: [{ name: '', description: '' }],
   };
@@ -201,6 +202,7 @@ export function startEditPartner(partner) {
     logo: partner.logoUrl || '',
     description: partner.description || '',
     achievements: partner.achievements || '',
+    parentId: partner.parentId || '',
     isActive: partner.isActive !== false,
     departments: partner.departments?.length
       ? partner.departments.map((item) => ({ name: item.name || '', description: item.description || '' }))

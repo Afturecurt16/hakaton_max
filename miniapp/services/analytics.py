@@ -21,10 +21,6 @@ def _identity_expression():
             MiniappAction.max_user_id.is_not(None),
             func.concat("max:", cast(MiniappAction.max_user_id, String)),
         ),
-        (
-            MiniappAction.telegram_id.is_not(None),
-            func.concat("tg:", cast(MiniappAction.telegram_id, String)),
-        ),
         else_=func.concat("session:", MiniappAction.session_id),
     )
 
@@ -160,7 +156,6 @@ async def export_metrics_csv(session: AsyncSession, days: int) -> bytes:
             "Экран",
             "Цель",
             "MAX ID",
-            "Telegram ID (legacy)",
             "ID сессии",
         ]
     )
@@ -173,7 +168,6 @@ async def export_metrics_csv(session: AsyncSession, days: int) -> bytes:
                 csv_safe(item.route),
                 csv_safe(item.target),
                 item.max_user_id or "",
-                item.telegram_id or "",
                 item.session_id,
             ]
         )

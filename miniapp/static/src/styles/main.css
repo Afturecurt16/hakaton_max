@@ -36,7 +36,7 @@
   font-family: Inter, "SF Pro Display", "Segoe UI", Arial, sans-serif;
 }
 
-/* ─── Dark theme (driven by Telegram colorScheme, see main.js) ─── */
+/* ─── Dark theme (driven by the MAX color scheme, see main.js) ─── */
 :root[data-theme="dark"] {
   color-scheme: dark;
 

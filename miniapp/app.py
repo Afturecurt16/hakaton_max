@@ -49,7 +49,7 @@ from database.models import (
 )
 from services.admins import is_max_admin
 from services.max_bot import MaxApiError, max_bot
-from services.partner_defaults import KEPT_PARTNER
+from services.partner_defaults import KEPT_PARTNER, VK_ECOSYSTEM_PARTNERS, VK_PARTNER
 from services.vacancy_scheduler import run_daily_vacancy_sync_scheduler
 
 from .services.max_auth import extract_user_id, verify_init_data
@@ -124,10 +124,19 @@ def _is_local_request(request: Request) -> bool:
     hostname = request.url.hostname or ""
     client_host = request.client.host if request.client else ""
     try:
-        client_is_loopback = ipaddress.ip_address(client_host).is_loopback
+        client_ip = ipaddress.ip_address(client_host)
+        client_is_loopback = client_ip.is_loopback
+        # Docker Desktop forwards a browser request from the Windows host into
+        # the container through its private bridge (normally 172.16/12), so
+        # it is not reported as 127.0.0.1 inside Uvicorn.
+        client_is_docker_bridge = client_ip in ipaddress.ip_network("172.16.0.0/12")
     except ValueError:
         client_is_loopback = client_host == "localhost"
-    return client_is_loopback and hostname in {"localhost", "127.0.0.1", "::1"}
+        client_is_docker_bridge = False
+    return (
+        (client_is_loopback or client_is_docker_bridge)
+        and hostname in {"localhost", "127.0.0.1", "::1"}
+    )
 
 
 async def require_admin(
@@ -204,6 +213,7 @@ class PartnerPayload(BaseModel):
     logo: str = ""
     description: str = ""
     achievements: str = ""
+    parentId: int | None = None
     isActive: bool = True
     departments: list[DepartmentPayload] = Field(default_factory=list)
 
@@ -273,17 +283,29 @@ def _apply_event_payload(event: MiniappEvent, payload: EventPayload) -> None:
     event.is_active = payload.isActive
 
 
-def _partner_to_frontend(company: Company, *, include_departments: bool = True) -> dict:
+def _partner_to_frontend(
+    company: Company,
+    *,
+    include_departments: bool = True,
+    include_children: bool = True,
+    children: list[Company] | None = None,
+) -> dict:
+    child_companies = children or []
     item = {
         "id": str(company.id),
         "name": company.name,
         "logoUrl": company.logo_url or "",
         "initial": (company.name[:1] or "К").upper(),
-        "brandColor": "#c40016",
+        "brandColor": "#2787f5" if company.name.casefold() == "vk" else "#c40016",
         "description": company.description or "",
         "achievements": company.achievements or "",
+        "parentId": str(company.parent_company_id) if company.parent_company_id else None,
+        # Do not dereference the self-referencing relationship here: in an
+        # async SQLAlchemy response it may otherwise trigger implicit I/O.
+        "parentName": "",
         "isActive": company.is_active,
         "departmentCount": len(company.divisions),
+        "childCount": len(child_companies),
     }
     if include_departments:
         item["departments"] = [
@@ -296,34 +318,80 @@ def _partner_to_frontend(company: Company, *, include_departments: bool = True) 
             }
             for department in company.divisions
         ]
+    item["children"] = (
+        [
+            _partner_to_frontend(child, include_departments=False, include_children=False)
+            for child in child_companies
+            if child.is_partner and child.is_active
+        ]
+        if include_children
+        else []
+    )
     return item
 
 
-def _default_partner_to_frontend(*, include_departments: bool = True) -> dict:
+def _default_partner_to_frontend_from_profile(
+    profile: dict,
+    partner_id: str,
+    *,
+    include_departments: bool = True,
+) -> dict:
     departments = [
         {
             "id": str(index),
-            "companyId": "1",
-            "companyName": KEPT_PARTNER["name"],
+            "companyId": partner_id,
+            "companyName": profile["name"],
             "name": item["name"],
             "description": item["description"],
         }
-        for index, item in enumerate(KEPT_PARTNER["departments"], start=1)
+        for index, item in enumerate(profile["departments"], start=1)
     ]
     partner = {
-        "id": "1",
-        "name": KEPT_PARTNER["name"],
-        "logoUrl": KEPT_PARTNER["logo_url"],
-        "initial": "K",
-        "brandColor": "#c40016",
-        "description": KEPT_PARTNER["description"],
-        "achievements": KEPT_PARTNER["achievements"],
+        "id": partner_id,
+        "name": profile["name"],
+        "logoUrl": profile["logo_url"],
+        "initial": profile["name"][:1].upper(),
+        "brandColor": "#2787f5" if profile["name"] == "VK" else "#c40016",
+        "description": profile["description"],
+        "achievements": profile["achievements"],
         "isActive": True,
         "departmentCount": len(departments),
+        "childCount": 0,
+        "children": [],
     }
     if include_departments:
         partner["departments"] = departments
     return partner
+
+
+def _default_partner_to_frontend(*, include_departments: bool = True) -> dict:
+    return _default_partner_to_frontend_from_profile(
+        KEPT_PARTNER,
+        "1",
+        include_departments=include_departments,
+    )
+
+
+def _default_vk_partner_to_frontend(*, include_departments: bool = True) -> dict:
+    partner = _default_partner_to_frontend_from_profile(
+        VK_PARTNER,
+        "2",
+        include_departments=include_departments,
+    )
+    partner["children"] = _default_vk_ecosystem_partners_to_frontend(include_departments=False)
+    partner["childCount"] = len(partner["children"])
+    return partner
+
+
+def _default_vk_ecosystem_partners_to_frontend(*, include_departments: bool = False) -> list[dict]:
+    return [
+        _default_partner_to_frontend_from_profile(
+            profile,
+            str(index),
+            include_departments=include_departments,
+        )
+        for index, profile in enumerate(VK_ECOSYSTEM_PARTNERS, start=3)
+    ]
 
 
 def _apply_partner_payload(company: Company, payload: PartnerPayload) -> None:
@@ -331,6 +399,7 @@ def _apply_partner_payload(company: Company, payload: PartnerPayload) -> None:
     company.logo_url = payload.logo.strip()
     company.description = payload.description.strip()
     company.achievements = payload.achievements.strip()
+    company.parent_company_id = payload.parentId
     company.is_partner = True
     company.is_active = payload.isActive
     company.divisions.clear()
@@ -339,6 +408,33 @@ def _apply_partner_payload(company: Company, payload: PartnerPayload) -> None:
         for item in payload.departments
         if item.name.strip()
     )
+
+
+async def _validate_parent_company(
+    session: AsyncSession,
+    parent_id: int | None,
+    *,
+    company_id: int | None = None,
+) -> int | None:
+    if parent_id is None:
+        return None
+    if company_id is not None and parent_id == company_id:
+        raise HTTPException(status_code=422, detail="Компания не может быть родителем самой себя")
+
+    parent = await session.get(Company, parent_id)
+    if not parent or not parent.is_partner:
+        raise HTTPException(status_code=422, detail="Родительская компания не найдена")
+
+    seen: set[int] = set()
+    cursor = parent
+    while cursor is not None:
+        if cursor.id in seen:
+            raise HTTPException(status_code=422, detail="Обнаружена циклическая иерархия компаний")
+        seen.add(cursor.id)
+        if company_id is not None and cursor.parent_company_id == company_id:
+            raise HTTPException(status_code=422, detail="Нельзя вложить компанию в собственное дочернее подразделение")
+        cursor = await session.get(Company, cursor.parent_company_id) if cursor.parent_company_id else None
+    return parent_id
 
 
 async def _get_partner(
@@ -352,9 +448,36 @@ async def _get_partner(
         conditions.append(Company.is_active.is_(True))
     return (
         await session.execute(
-            select(Company).options(selectinload(Company.divisions)).where(*conditions)
+            select(Company)
+            .options(
+                selectinload(Company.divisions),
+            )
+            .where(*conditions)
         )
     ).scalar_one_or_none()
+
+
+async def _get_partner_children(
+    session: AsyncSession,
+    parent_ids: list[int],
+    *,
+    public_only: bool = True,
+) -> dict[int, list[Company]]:
+    if not parent_ids:
+        return {}
+    conditions = [Company.parent_company_id.in_(parent_ids), Company.is_partner.is_(True)]
+    if public_only:
+        conditions.append(Company.is_active.is_(True))
+    result = await session.execute(
+        select(Company)
+        .options(selectinload(Company.divisions))
+        .where(*conditions)
+        .order_by(Company.name)
+    )
+    children: dict[int, list[Company]] = {}
+    for company in result.scalars().all():
+        children.setdefault(company.parent_company_id, []).append(company)
+    return children
 
 
 @app.middleware("http")
@@ -459,16 +582,33 @@ async def list_partners(session: AsyncSession = Depends(get_session)):
         result = await session.execute(
             select(Company)
             .options(selectinload(Company.divisions))
-            .where(Company.is_partner.is_(True), Company.is_active.is_(True))
+            .where(
+                Company.is_partner.is_(True),
+                Company.is_active.is_(True),
+                Company.parent_company_id.is_(None),
+            )
             .order_by(Company.name)
         )
     except (SQLAlchemyError, OSError) as exc:
         logging.getLogger(__name__).warning("Using default partners because the database is unavailable: %s", exc)
-        item = _default_partner_to_frontend(include_departments=False)
-        return {"source": "defaults", "items": [item], "total": 1}
+        items = [
+            _default_partner_to_frontend(include_departments=False),
+            _default_vk_partner_to_frontend(include_departments=False),
+            *_default_vk_ecosystem_partners_to_frontend(include_departments=False),
+        ]
+        return {"source": "defaults", "items": items, "total": len(items)}
+    companies = result.scalars().all()
+    children_by_parent = await _get_partner_children(
+        session,
+        [company.id for company in companies],
+    )
     items = [
-        _partner_to_frontend(company, include_departments=False)
-        for company in result.scalars().all()
+        _partner_to_frontend(
+            company,
+            include_departments=False,
+            children=children_by_parent.get(company.id, []),
+        )
+        for company in companies
     ]
     return {"source": "database", "items": items, "total": len(items)}
 
@@ -481,10 +621,22 @@ async def get_partner(partner_id: int, session: AsyncSession = Depends(get_sessi
         logging.getLogger(__name__).warning("Using default partner because the database is unavailable: %s", exc)
         if partner_id == 1:
             return _default_partner_to_frontend()
+        if partner_id == 2:
+            return _default_vk_partner_to_frontend()
+        ecosystem_index = partner_id - 3
+        if 0 <= ecosystem_index < len(VK_ECOSYSTEM_PARTNERS):
+            return _default_partner_to_frontend_from_profile(
+                VK_ECOSYSTEM_PARTNERS[ecosystem_index],
+                str(partner_id),
+            )
         raise HTTPException(status_code=404, detail="Partner not found") from exc
     if not company:
         raise HTTPException(status_code=404, detail="Partner not found")
-    return _partner_to_frontend(company)
+    children_by_parent = await _get_partner_children(session, [company.id])
+    return _partner_to_frontend(
+        company,
+        children=children_by_parent.get(company.id, []),
+    )
 
 
 @app.get("/api/v1/partners/{partner_id}/departments/{department_id}")
@@ -497,12 +649,24 @@ async def get_partner_department(
         company = await _get_partner(session, partner_id, public_only=True)
     except (SQLAlchemyError, OSError) as exc:
         logging.getLogger(__name__).warning("Using default department because the database is unavailable: %s", exc)
-        partner = _default_partner_to_frontend()
+        partner = (
+            _default_partner_to_frontend()
+            if partner_id == 1
+            else _default_vk_partner_to_frontend()
+            if partner_id == 2
+            else _default_partner_to_frontend_from_profile(
+                VK_ECOSYSTEM_PARTNERS[partner_id - 3],
+            )
+            if 3 <= partner_id < 3 + len(VK_ECOSYSTEM_PARTNERS)
+            else None
+        )
+        if partner is None:
+            raise HTTPException(status_code=404, detail="Partner not found") from exc
         department = next(
             (item for item in partner["departments"] if item["id"] == str(department_id)),
             None,
         )
-        if partner_id != 1 or not department:
+        if not department:
             raise HTTPException(status_code=404, detail="Department not found") from exc
         return {**department, "companyLogoUrl": partner["logoUrl"]}
     if not company:
@@ -531,7 +695,17 @@ async def admin_list_partners(
         .where(Company.is_partner.is_(True))
         .order_by(Company.name)
     )
-    return {"items": [_partner_to_frontend(company) for company in result.scalars().all()]}
+    companies = result.scalars().all()
+    children_by_parent: dict[int, list[Company]] = {}
+    for company in companies:
+        if company.parent_company_id:
+            children_by_parent.setdefault(company.parent_company_id, []).append(company)
+    return {
+        "items": [
+            _partner_to_frontend(company, children=children_by_parent.get(company.id, []))
+            for company in companies
+        ]
+    }
 
 
 @app.post("/api/v1/admin/partners", status_code=201)
@@ -555,6 +729,8 @@ async def admin_create_partner(
     else:
         await session.refresh(company, attribute_names=["divisions"])
 
+    await session.flush()
+    await _validate_parent_company(session, payload.parentId, company_id=company.id)
     _apply_partner_payload(company, payload)
     await session.commit()
     company = await _get_partner(session, company.id)
@@ -585,6 +761,7 @@ async def admin_update_partner(
     if duplicate:
         raise HTTPException(status_code=409, detail="Company with this name already exists")
 
+    await _validate_parent_company(session, payload.parentId, company_id=company.id)
     _apply_partner_payload(company, payload)
     await session.commit()
     company = await _get_partner(session, partner_id)

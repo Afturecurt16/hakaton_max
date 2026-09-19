@@ -32,7 +32,7 @@ HEADER_ALIASES = {
     "vacancy_url": ("Ссылка на вакансию",),
 }
 
-# Same 9 faculty checkbox columns the Telegram bot reads in services/google_sheets.py
+# Same 9 faculty checkbox columns used by the vacancy synchronizer.
 # (FACULTY_SHEET_TO_DB) — sheet header paired with the short label used in the bot's
 # faculty menu (config.py FACULTIES), in that menu's display order.
 FACULTY_COLUMNS = [

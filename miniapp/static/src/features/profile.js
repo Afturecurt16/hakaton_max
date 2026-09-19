@@ -246,6 +246,13 @@ function adminSettingsSection() {
 function adminPartnerFormSection() {
   const draft = store.adminPartnerDraft;
   const isEditing = Boolean(store.adminPartnerEditingId);
+  const parentOptions = store.adminPartners
+    .filter((partner) => partner.id !== String(store.adminPartnerEditingId || ''))
+    .map((partner) => `
+      <option value="${escapeHtml(partner.id)}" ${String(draft.parentId || '') === String(partner.id) ? 'selected' : ''}>
+        ${escapeHtml(partner.parentName ? `${partner.parentName} → ${partner.name}` : partner.name)}
+      </option>`)
+    .join('');
 
   return `
     <section class="admin-window partner-admin-window">
@@ -256,6 +263,11 @@ function adminPartnerFormSection() {
         <input id="adminPartnerName" type="text" placeholder="Название компании" value="${escapeHtml(draft.name)}" />
         <label class="sr-only" for="adminPartnerLogo">Ссылка на логотип</label>
         <input id="adminPartnerLogo" type="text" placeholder="Ссылка на логотип" value="${escapeHtml(draft.logo)}" />
+        <label class="admin-field-label" for="adminPartnerParent">Родительская компания или группа</label>
+        <select id="adminPartnerParent">
+          <option value="">Верхний уровень — отдельная карточка</option>
+          ${parentOptions}
+        </select>
         <label class="admin-field-label" for="adminPartnerDescription">О компании</label>
         <textarea id="adminPartnerDescription" rows="6" placeholder="Краткое описание компании">${escapeHtml(draft.description)}</textarea>
         <label class="admin-field-label" for="adminPartnerAchievements">Заслуги и достижения</label>
@@ -293,7 +305,7 @@ function adminPartnerFormSection() {
       ${listRows(store.adminPartners, 'Партнеры пока не добавлены.', (partner) => `
         <article>
           <strong>${escapeHtml(partner.name)}</strong>
-          <span>${partner.departmentCount} департаментов${partner.isActive ? '' : ' · скрыто'}</span>
+          <span>${partner.parentName ? `${escapeHtml(partner.parentName)} · ` : ''}${partner.departmentCount} департаментов${partner.childCount ? ` · ${partner.childCount} вложенных компаний` : ''}${partner.isActive ? '' : ' · скрыто'}</span>
           <div class="admin-list-actions">
             <button class="btn btn-ghost btn-small" type="button" data-action="edit-admin-partner" data-id="${escapeHtml(partner.id)}">${icons.pencil}<span>Редактировать</span></button>
             <button class="btn btn-ghost btn-small" type="button" data-action="delete-admin-partner" data-id="${escapeHtml(partner.id)}">${icons.trash}<span>Удалить</span></button>

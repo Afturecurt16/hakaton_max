@@ -61,6 +61,10 @@ logs/
 
 # Docker
 .dockerignore
+.docker-local/
+
+# Local deployment archives
+*.zip
 
 # OS
 Thumbs.db

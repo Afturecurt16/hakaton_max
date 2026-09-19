@@ -618,7 +618,7 @@ def generate_and_cache(vacancy) -> bytes:
 
 
 def get_cached_or_generate(vacancy) -> bytes:
-    """Return a fresh cached image for Telegram delivery."""
+    """Return a fresh cached image for a vacancy card."""
     if is_cache_fresh(vacancy):
         return get_vacancy_cache_path(vacancy.id).read_bytes()
     return generate_and_cache(vacancy)

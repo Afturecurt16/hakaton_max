@@ -3,14 +3,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Установка системных зависимостей
-RUN apt-get update && apt-get install -y \
-    gcc \
+RUN apt-get -o Acquire::Retries=5 update && apt-get install -y --no-install-recommends \
     postgresql-client \
-    fonts-dejavu-core \
-    fonts-liberation \
-    fontconfig \
-    && rm -rf /var/lib/apt/lists/* \
-    && fc-cache -f -v
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Копирование файлов зависимостей
 COPY requirements.txt .

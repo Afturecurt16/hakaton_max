@@ -49,10 +49,10 @@ import {
 } from '../services/api.js';
 
 const app = document.querySelector('#app');
-const tg = window.WebApp;
+const maxBridge = window.WebApp;
 const METRICS_SESSION_KEY = 'kvs-job:metrics-session';
 // Signed MAX initData is the reliable signal that the app is embedded.
-const isEmbedded = Boolean(tg?.initData);
+const isEmbedded = Boolean(maxBridge?.initData);
 
 function metricsSessionId() {
   let value = window.localStorage.getItem(METRICS_SESSION_KEY);
@@ -75,9 +75,9 @@ function recordMetric(eventType, action, route, target = '', metadata = {}) {
   });
 }
 
-tg?.ready?.();
-tg?.expand?.();
-tg?.disableVerticalSwipes?.();
+maxBridge?.ready?.();
+maxBridge?.expand?.();
+maxBridge?.disableVerticalSwipes?.();
 
 const THEME_COLORS = {
   light: { header: '#ffffff', bg: '#f2f2f2' },
@@ -88,24 +88,24 @@ function applyTheme(scheme) {
   const theme = scheme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme].header);
-  tg?.setHeaderColor?.(THEME_COLORS[theme].header);
-  tg?.setBackgroundColor?.(THEME_COLORS[theme].bg);
+  maxBridge?.setHeaderColor?.(THEME_COLORS[theme].header);
+  maxBridge?.setBackgroundColor?.(THEME_COLORS[theme].bg);
 }
 
 function resolveScheme() {
-  if (isEmbedded) return tg.colorScheme === 'dark' ? 'dark' : 'light';
+  if (isEmbedded) return maxBridge.colorScheme === 'dark' ? 'dark' : 'light';
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 applyTheme(resolveScheme());
 if (isEmbedded) {
-  tg.onEvent?.('themeChanged', () => applyTheme(resolveScheme()));
+  maxBridge.onEvent?.('themeChanged', () => applyTheme(resolveScheme()));
 } else {
   window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(resolveScheme()));
 }
 
 function haptic(type = 'light') {
-  tg?.HapticFeedback?.impactOccurred(type);
+  maxBridge?.HapticFeedback?.impactOccurred(type);
 }
 
 /* ─── Navigation direction & view transitions ─────────────────── */
@@ -190,14 +190,14 @@ function goBack() {
   }
 }
 
-if (isEmbedded && tg.BackButton) tg.BackButton.onClick(goBack);
+if (isEmbedded && maxBridge.BackButton) maxBridge.BackButton.onClick(goBack);
 
 function syncBackButton(route) {
-  if (!isEmbedded || !tg.BackButton) return;
+  if (!isEmbedded || !maxBridge.BackButton) return;
   if ((ROUTE_LEVELS[route.name] ?? 1) > 1) {
-    tg.BackButton.show();
+    maxBridge.BackButton.show();
   } else {
-    tg.BackButton.hide();
+    maxBridge.BackButton.hide();
   }
 }
 
@@ -345,8 +345,8 @@ function bindInputs() {
 function openExternal(url) {
   if (!url) return;
   haptic('medium');
-  if (tg?.openLink) {
-    tg.openLink(url);
+  if (maxBridge?.openLink) {
+    maxBridge.openLink(url);
   } else {
     window.open(url, '_blank', 'noopener');
   }
@@ -357,8 +357,8 @@ function shareVacancy(url) {
   const title = document.querySelector('.detail-content h1')?.textContent?.trim() || 'Вакансия';
   const text = `${title} — нашёл в KVS Job`;
 
-  if (isEmbedded && tg.shareMaxContent) {
-    tg.shareMaxContent({ text, link: url });
+  if (isEmbedded && maxBridge.shareMaxContent) {
+    maxBridge.shareMaxContent({ text, link: url });
   } else if (navigator.share) {
     navigator.share({ title, text, url }).catch(() => {});
   } else if (navigator.clipboard?.writeText) {
@@ -372,6 +372,9 @@ function readPartnerDraft() {
     logo: document.querySelector('#adminPartnerLogo')?.value?.trim() || '',
     description: document.querySelector('#adminPartnerDescription')?.value?.trim() || '',
     achievements: document.querySelector('#adminPartnerAchievements')?.value?.trim() || '',
+    parentId: document.querySelector('#adminPartnerParent')?.value
+      ? Number(document.querySelector('#adminPartnerParent').value)
+      : null,
     isActive: document.querySelector('#adminPartnerActive')?.checked ?? true,
     departments: [...document.querySelectorAll('[data-partner-department]')].map((row) => ({
       name: row.querySelector('[data-department-name]')?.value?.trim() || '',
@@ -403,7 +406,7 @@ document.addEventListener('click', (e) => {
   if (action === 'share-vacancy') shareVacancy(target.dataset.url);
   if (action === 'open-max-channel') {
     const url = store.subscription.channelUrl;
-    if (url) tg?.openMaxLink ? tg.openMaxLink(url) : window.open(url, '_blank', 'noopener');
+    if (url) maxBridge?.openMaxLink ? maxBridge.openMaxLink(url) : window.open(url, '_blank', 'noopener');
   }
   if (action === 'check-max-subscription') {
     target.disabled = true;
@@ -418,7 +421,7 @@ document.addEventListener('click', (e) => {
     target.disabled = true;
     (isRegistered ? unregisterEvent(eventId) : registerEvent(eventId))
       .then((result) => {
-        tg?.HapticFeedback?.notificationOccurred?.(isRegistered ? 'warning' : 'success');
+        maxBridge?.HapticFeedback?.notificationOccurred?.(isRegistered ? 'warning' : 'success');
         const message = isRegistered
           ? 'Вы отказались от участия'
           : result?.registrationStatus === 'reserve'
@@ -426,14 +429,14 @@ document.addEventListener('click', (e) => {
             : 'Вы зарегистрированы. Место подтверждено.';
         showToast(message, isRegistered ? icons.trash : icons.check);
         if (!isRegistered) {
-          if (tg?.showAlert) tg.showAlert(message);
+          if (maxBridge?.showAlert) maxBridge.showAlert(message);
           else window.alert(message);
         }
         render({ silent: true });
       })
       .catch((error) => {
         target.disabled = false;
-        tg?.HapticFeedback?.notificationOccurred?.('error');
+        maxBridge?.HapticFeedback?.notificationOccurred?.('error');
         if (error.status === 403) store.subscription.checked = false;
         showToast(error.message || 'Не удалось изменить регистрацию', icons.link);
         if (error.status === 403) render();
@@ -448,7 +451,7 @@ document.addEventListener('click', (e) => {
   if (action === 'submit-profile-email') {
     const email = document.querySelector('#profileEmail')?.value;
     const ok = submitProfileEmail(email);
-    if (!ok) tg?.HapticFeedback?.notificationOccurred?.('error');
+    if (!ok) maxBridge?.HapticFeedback?.notificationOccurred?.('error');
     render().then(() => { if (!ok) document.querySelector('#profileEmail')?.focus(); });
   }
 
@@ -472,7 +475,7 @@ document.addEventListener('click', (e) => {
       name: document.querySelector('#adminDeveloperName')?.value,
       email: document.querySelector('#adminDeveloperEmail')?.value,
     });
-    if (!ok) tg?.HapticFeedback?.notificationOccurred?.('error');
+    if (!ok) maxBridge?.HapticFeedback?.notificationOccurred?.('error');
     render().then(() => { if (!ok) document.querySelector('#adminDeveloperName')?.focus(); });
   }
 
@@ -481,7 +484,7 @@ document.addEventListener('click', (e) => {
       title: document.querySelector('#adminPlaceTitle')?.value,
       address: document.querySelector('#adminPlaceAddress')?.value,
     });
-    if (!ok) tg?.HapticFeedback?.notificationOccurred?.('error');
+    if (!ok) maxBridge?.HapticFeedback?.notificationOccurred?.('error');
     render().then(() => { if (!ok) document.querySelector('#adminPlaceTitle')?.focus(); });
   }
 
@@ -502,7 +505,7 @@ document.addEventListener('click', (e) => {
     setPartnerDraft(payload);
     if (!payload.name) {
       store.adminPartnerError = 'Укажи название компании';
-      tg?.HapticFeedback?.notificationOccurred?.('error');
+      maxBridge?.HapticFeedback?.notificationOccurred?.('error');
       render().then(() => document.querySelector('#adminPartnerName')?.focus());
     } else {
       payload.departments = payload.departments.filter((item) => item.name);
@@ -510,13 +513,13 @@ document.addEventListener('click', (e) => {
       (editingId ? updatePartner(editingId, payload) : createPartner(payload))
         .then(() => {
           startCreatePartner();
-          tg?.HapticFeedback?.notificationOccurred?.('success');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
           showToast(editingId ? 'Партнер обновлен' : 'Партнер добавлен', icons.check);
           render();
         })
         .catch((error) => {
           store.adminPartnerError = error.message || 'Не удалось сохранить партнера';
-          tg?.HapticFeedback?.notificationOccurred?.('error');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('error');
           render();
         });
     }
@@ -541,13 +544,13 @@ document.addEventListener('click', (e) => {
       deletePartner(partnerId)
         .then(() => {
           if (store.adminPartnerEditingId === partnerId) startCreatePartner();
-          tg?.HapticFeedback?.notificationOccurred?.('success');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
           showToast('Партнер удален', icons.trash);
           render();
         })
         .catch((error) => {
           store.adminPartnerError = error.message || 'Не удалось удалить партнера';
-          tg?.HapticFeedback?.notificationOccurred?.('error');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('error');
           render();
         });
     }
@@ -565,7 +568,7 @@ document.addEventListener('click', (e) => {
       .then(() => showToast('Статистика скачана', icons.download))
       .catch((error) => {
         store.adminMetricsError = error.message || 'Не удалось скачать статистику';
-        tg?.HapticFeedback?.notificationOccurred?.('error');
+        maxBridge?.HapticFeedback?.notificationOccurred?.('error');
         render({ silent: true });
       });
   }
@@ -575,7 +578,7 @@ document.addEventListener('click', (e) => {
     const capacity = Number(document.querySelector('#adminEventCapacity')?.value || 0);
     if (!title || !Number.isInteger(capacity) || capacity < 1) {
       store.adminEventError = !title ? 'Укажи название мероприятия' : 'Укажи лимит участников больше нуля';
-      tg?.HapticFeedback?.notificationOccurred?.('error');
+      maxBridge?.HapticFeedback?.notificationOccurred?.('error');
       showToast(store.adminEventError, icons.link);
       document.querySelector(!title ? '#adminEventTitle' : '#adminEventCapacity')?.focus();
     } else {
@@ -608,14 +611,14 @@ document.addEventListener('click', (e) => {
         .then(() => {
           store.adminEventError = '';
           startCreateEvent();
-          tg?.HapticFeedback?.notificationOccurred?.('success');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
           showToast(editingId ? 'Мероприятие обновлено' : 'Мероприятие добавлено', icons.check);
           render();
         })
         .catch((error) => {
           target.disabled = false;
           store.adminEventError = error.message || 'Не удалось сохранить мероприятие';
-          tg?.HapticFeedback?.notificationOccurred?.('error');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('error');
           showToast(store.adminEventError, icons.link);
         });
     }
@@ -638,7 +641,7 @@ document.addEventListener('click', (e) => {
     } else {
       // store.adminEvents is only stale if the list fetch failed or hasn't
       // resolved yet — surface that instead of silently doing nothing.
-      tg?.HapticFeedback?.notificationOccurred?.('error');
+      maxBridge?.HapticFeedback?.notificationOccurred?.('error');
       showToast('Не удалось открыть мероприятие для редактирования', icons.link);
     }
   }
@@ -658,14 +661,14 @@ document.addEventListener('click', (e) => {
       target.disabled = true;
       sendEventMessage(target.dataset.id, { text, audience })
         .then((result) => {
-          tg?.HapticFeedback?.notificationOccurred?.('success');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
           showToast(`Отправлено в MAX: ${result.sent} из ${result.total}`, icons.mail);
           if (row?.querySelector('[data-event-message-text]')) row.querySelector('[data-event-message-text]').value = '';
           target.disabled = false;
         })
         .catch((error) => {
           target.disabled = false;
-          tg?.HapticFeedback?.notificationOccurred?.('error');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('error');
           showToast(error.message || 'Не удалось отправить сообщение', icons.link);
         });
     }
@@ -677,14 +680,14 @@ document.addEventListener('click', (e) => {
       deleteEvent(eventId)
         .then(() => {
           if (store.adminEventEditingId === eventId) startCreateEvent();
-          tg?.HapticFeedback?.notificationOccurred?.('success');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
           showToast('Мероприятие удалено', icons.trash);
           render();
         })
         .catch((error) => {
           const message = error.message || 'Не удалось удалить мероприятие';
           store.adminEventError = message;
-          tg?.HapticFeedback?.notificationOccurred?.('error');
+          maxBridge?.HapticFeedback?.notificationOccurred?.('error');
           // The admin panel's own error banner isn't visible from other
           // screens (e.g. this button also lives on public event cards now),
           // so show a toast too rather than failing silently there.
@@ -692,7 +695,7 @@ document.addEventListener('click', (e) => {
           render();
         });
     };
-    // tg.showConfirm() is gated on the client negotiating a recent enough Bot
+    // Native confirmation availability varies by MAX client version.
     // API version — on a client that doesn't support it, it can silently do
     // nothing (no error, no callback), which looked exactly like "delete is
     // broken". window.confirm() is a plain browser API and works reliably
@@ -724,7 +727,7 @@ document.addEventListener('click', (e) => {
     const id = target.dataset.id;
     toggleFavorite(id);
     const active = store.favorites.has(id);
-    tg?.HapticFeedback?.notificationOccurred?.(active ? 'success' : 'warning');
+    maxBridge?.HapticFeedback?.notificationOccurred?.(active ? 'success' : 'warning');
 
     // Update hearts in place so the pop animation plays instead of a full re-render.
     document.querySelectorAll('.heart-btn').forEach((btn) => {
