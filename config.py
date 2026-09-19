@@ -35,6 +35,7 @@ MAX_ADMIN_IDS = (
     if os.getenv("MAX_ADMIN_IDS")
     else []
 )
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "253103@edu.fa.ru").strip().casefold()
 MAX_API_BASE_URL = os.getenv(
     "MAX_API_BASE_URL",
     "https://platform-api2.max.ru",

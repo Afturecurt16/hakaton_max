@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from config import (
+    ADMIN_EMAIL,
     MAX_BOT_TOKEN,
     MINIAPP_DEV_ADMIN_ENABLED,
     MINIAPP_PUBLIC_URL,
@@ -47,7 +48,6 @@ from database.models import (
     Vacancy,
     VacancySyncState,
 )
-from services.admins import is_max_admin
 from services.max_bot import MaxApiError, max_bot
 from services.partner_defaults import KEPT_PARTNER, VK_ECOSYSTEM_PARTNERS, VK_PARTNER
 from services.vacancy_scheduler import run_daily_vacancy_sync_scheduler
@@ -142,23 +142,13 @@ def _is_local_request(request: Request) -> bool:
 async def require_admin(
     request: Request,
     x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    x_admin_email: str = Header(default="", alias="X-Admin-Email"),
 ) -> int:
-    """Verify MAX initData and the server-side MAX administrator list."""
-    if MINIAPP_DEV_ADMIN_ENABLED and not x_max_init_data and _is_local_request(request):
+    """Educational admin gate using the configured profile email."""
+    del request, x_max_init_data
+    if ADMIN_EMAIL and x_admin_email.strip().casefold() == ADMIN_EMAIL:
         return 0
-
-    if not MAX_BOT_TOKEN:
-        raise HTTPException(status_code=503, detail="MAX bot token is not configured")
-
-    parsed = verify_init_data(x_max_init_data, MAX_BOT_TOKEN)
-    if not parsed:
-        raise HTTPException(status_code=401, detail="Invalid or missing MAX auth")
-
-    user_id = extract_user_id(parsed)
-    if not user_id or not await is_max_admin(user_id):
-        raise HTTPException(status_code=403, detail="Admin access required")
-
-    return user_id
+    raise HTTPException(status_code=401, detail="Invalid or missing admin email")
 
 
 def _resolve_miniapp_user(request: Request, init_data: str) -> int | None:

@@ -1,6 +1,7 @@
 const FAVORITES_KEY = 'kvs-job:favorites';
 const ONBOARDING_KEY = 'kvs-job:onboarding-seen';
 const ADMIN_EMAIL = '253103@edu.fa.ru';
+const PROFILE_EMAIL_KEY = 'kvs-job:profile-email';
 const ADMIN_DEVELOPERS_KEY = 'kvs-job:admin-developers';
 const ADMIN_PLACES_KEY = 'kvs-job:admin-places';
 
@@ -61,7 +62,7 @@ export const store = {
   },
   profileTab: 'resume',
   profileLoginMode: 'button',
-  profileEmail: '',
+  profileEmail: window.localStorage.getItem(PROFILE_EMAIL_KEY) || '',
   profileEmailError: '',
   adminMode: 'panel',
   adminSection: 'events',
@@ -107,6 +108,7 @@ export function submitProfileEmail(email) {
     return false;
   }
   store.profileEmail = normalized;
+  window.localStorage.setItem(PROFILE_EMAIL_KEY, normalized);
   store.profileEmailError = '';
   store.profileLoginMode = 'button';
   store.adminMode = normalized === ADMIN_EMAIL ? 'panel' : 'profile';
@@ -115,6 +117,7 @@ export function submitProfileEmail(email) {
 
 export function logoutProfile() {
   store.profileEmail = '';
+  window.localStorage.removeItem(PROFILE_EMAIL_KEY);
   store.profileLoginMode = 'button';
   store.profileEmailError = '';
   store.adminMode = 'panel';

@@ -46,13 +46,18 @@ function authHeaders() {
   return initData ? { 'X-Max-Init-Data': initData } : {};
 }
 
+function adminAuthHeaders() {
+  const email = window.localStorage.getItem('kvs-job:profile-email') || '';
+  return { ...authHeaders(), 'X-Admin-Email': email };
+}
+
 // Admin mutations hit the real backend directly — there's no meaningful "mock
 // mode" for writes against the database, and the server verifies the caller
 // is an admin via signed MAX initData regardless of what the client sends.
 async function adminRequest(path, { method = 'GET', body } = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...adminAuthHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
@@ -224,7 +229,7 @@ export async function deleteEvent(id) {
 export async function uploadEventImage(file) {
   const response = await fetch(`${API_BASE}/admin/events/upload`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': file.type },
+    headers: { ...adminAuthHeaders(), 'Content-Type': file.type },
     body: file,
   });
   if (!response.ok) {
@@ -273,7 +278,7 @@ export async function getAdminMetrics(days = 30) {
 
 export async function downloadAdminMetrics(days = 30) {
   const response = await fetch(`${API_BASE}/admin/metrics/export?days=${encodeURIComponent(days)}`, {
-    headers: authHeaders(),
+    headers: adminAuthHeaders(),
   });
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
