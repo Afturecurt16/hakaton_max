@@ -82,11 +82,14 @@ COMPANY_LOGOS: list[tuple[str, str, str, tuple[str, ...]]] = [
     ("kept_kpmg", "svg", "#00338D", ("kept", "кэпт", "kpmg", "кпмг")),
     ("deloitte", "svg", "#86BC25", ("deloitte", "делойт")),
     ("pwc", "svg", "#D04A02", ("pwc", "технологии доверия", "pricewaterhousecoopers")),
-    ("ey", "svg", "#FFE600", ("эрнст энд янг", "ernst & young", "б1", "b1")),
+    ("b1", "png", "#14A557", ("б1", "b1")),
+    ("ey", "svg", "#FFE600", ("эрнст энд янг", "ernst & young", "ey")),
     ("sibur", "svg", "#00A19C", ("сибур", "sibur")),
     ("cbrf", "svg", "#6D6E71", ("банк россии", "центральный банк", "центробанк", "цб рф")),
     ("gazprombank", "svg", "#476BF0", ("газпромбанк", "gazprombank", "gazprom bank", "банк гпб", "gpb bank")),
     ("mars", "svg", "#0000A0", ("mars incorporated", "mars inc", "марс", "марс инкорпорейтед", "mars")),
+    ("uralsib", "png", "#5B268B", ("уралсиб", "uralsib")),
+    ("pg", "png", "#003DA5", ("procter & gamble", "procter and gamble", "p&g", "p and g")),
     # Kept last: "газпром" alone would also match the unrelated Газпромбанк/Газпром нефть
     # subsidiaries. Газпромбанк resolves above; Газпром нефть is excluded explicitly below.
     ("gazprom", "svg", "#0079C1", ("газпром",)),

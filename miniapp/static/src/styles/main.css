@@ -502,6 +502,8 @@ svg {
 
 .heart-btn.is-active { color: var(--color-primary); }
 .heart-btn svg { width: 32px; height: 32px; }
+.heart-btn .icon-heart-filled { fill: currentColor; stroke: none; }
+.heart-btn .icon-heart-outline { fill: none; }
 
 .meta-row,
 .tag-cloud,
@@ -574,9 +576,26 @@ svg {
   padding-top: 16px;
 }
 
+.event-actions {
+  display: grid;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.event-deadline {
+  min-width: 0;
+}
+
+.event-deadline .deadline {
+  display: flex;
+  width: 100%;
+  white-space: normal;
+}
+
 .event-action-buttons {
   display: flex;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  flex-shrink: 1;
   align-items: center;
   gap: 8px;
 }
@@ -1073,6 +1092,26 @@ svg {
   color: var(--color-primary);
 }
 
+.admin-sync-vacancies {
+  width: 100%;
+  justify-content: center;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.admin-help-text,
+.admin-sync-result {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.admin-sync-result {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
 .admin-form {
   display: grid;
   gap: 10px;
@@ -1123,6 +1162,24 @@ svg {
 }
 
 .admin-field-label { color: var(--color-muted); font-size: 14px; font-weight: 700; }
+
+.admin-field-hint {
+  margin-top: -4px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-field-with-help {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-field-with-help small {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
 
 .admin-department-head,
 .admin-department-title {
@@ -2091,6 +2148,25 @@ html[data-nav="tab-back"]::view-transition-new(root)    { animation-name: vt-fad
   color: #775500;
   font-size: 13px;
   line-height: 1.35;
+}
+
+.initial-loading {
+  margin-top: 24vh;
+  text-align: center;
+}
+
+.loading-pulse {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--color-divider);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: loading-spin 800ms linear infinite;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
 }
 
 .sync-banner svg {

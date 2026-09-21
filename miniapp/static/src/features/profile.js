@@ -203,12 +203,16 @@ function adminPanelShell(managedContentHtml) {
       </div>
       <nav class="admin-sections" aria-label="Разделы панели">
         ${[
+          ['vacancies', 'Вакансии'],
           ['events', 'Мероприятия'],
           ['partners', 'Партнёры'],
           ['metrics', 'Статистика'],
           ['settings', 'Настройки'],
         ].map(([id, label]) => `<button type="button" class="${store.adminSection === id ? 'is-active' : ''}" data-action="set-admin-section" data-value="${id}">${label}</button>`).join('')}
       </nav>
+      <button class="btn btn-ghost admin-sync-vacancies" type="button" data-action="sync-admin-vacancies">
+        Обновить вакансии из Google Таблицы
+      </button>
     </section>
 
     ${managedContentHtml}
@@ -241,6 +245,18 @@ function adminSettingsSection() {
     </section>
     <section class="admin-list"><h2>Разработчики</h2>${listRows(store.adminDevelopers, 'Разработчики пока не добавлены.', (item) => `<article><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.email)}</span></article>`)}</section>
     <section class="admin-list"><h2>Места</h2>${listRows(store.adminPlaces, 'Места пока не добавлены.', (item) => `<article><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.address)}</span></article>`)}</section>`;
+}
+
+function adminVacanciesSection() {
+  return `
+    <section class="admin-window">
+      <section class="admin-form admin-vacancies-form">
+        <h2>Вакансии для пользователей</h2>
+        <p class="admin-help-text">Здесь можно вручную загрузить актуальные вакансии из подключённой Google Таблицы. После успешного обновления они сразу появятся в разделе «Вакансии».</p>
+        <button class="btn btn-primary" type="button" data-action="sync-admin-vacancies">Обновить вакансии сейчас</button>
+        ${store.adminVacancySyncStatus ? `<p class="admin-sync-result" role="status">${escapeHtml(store.adminVacancySyncStatus)}</p>` : ''}
+      </section>
+    </section>`;
 }
 
 function adminPartnerFormSection() {
@@ -327,10 +343,15 @@ function adminEventFormSection() {
         <label class="sr-only" for="adminEventTitle">Название</label>
         <input id="adminEventTitle" type="text" placeholder="Название мероприятия" value="${escapeHtml(draft.title)}" />
         <div class="form-grid">
-          <label class="sr-only" for="adminEventCategory">Категория</label>
-          <input id="adminEventCategory" type="text" placeholder="Категория (Хакатоны, Воркшопы...)" value="${escapeHtml(draft.category)}" />
-          <label class="sr-only" for="adminEventFormat">Формат</label>
-          <input id="adminEventFormat" type="text" placeholder="Формат (Онлайн/Офлайн/Гибрид)" value="${escapeHtml(draft.format)}" />
+          <div class="admin-field-with-help">
+            <label class="admin-field-label" for="adminEventCategory">Категория</label>
+            <input id="adminEventCategory" type="text" placeholder="Например: Хакатоны" value="${escapeHtml(draft.category)}" />
+            <small>Группа события для фильтра в приложении: «Хакатоны», «Воркшопы», «Дни карьеры» или своё значение.</small>
+          </div>
+          <div class="admin-field-with-help">
+            <label class="admin-field-label" for="adminEventFormat">Формат</label>
+            <input id="adminEventFormat" type="text" placeholder="Онлайн / Офлайн / Гибрид" value="${escapeHtml(draft.format)}" />
+          </div>
         </div>
         <label class="admin-field-label" for="adminEventStartsAt">Точная дата и время для регистрации и уведомлений</label>
         <input id="adminEventStartsAt" type="datetime-local" value="${escapeHtml(draft.startsAt)}" />
@@ -346,14 +367,15 @@ function adminEventFormSection() {
         </div>
         <label class="admin-field-label" for="adminEventDescription">Описание мероприятия</label>
         <textarea id="adminEventDescription" rows="6" placeholder="Программа, формат участия и важные детали">${escapeHtml(draft.description)}</textarea>
-        <label class="sr-only" for="adminEventDeadline">Дедлайн</label>
-        <input id="adminEventDeadline" type="text" placeholder="Текст про дедлайн регистрации" value="${escapeHtml(draft.deadline)}" />
+        <label class="admin-field-label" for="adminEventDeadline">Пояснение по регистрации</label>
+        <input id="adminEventDeadline" type="text" placeholder="Например: Регистрация до 20 сентября" value="${escapeHtml(draft.deadline)}" />
         <label class="admin-field-label" for="adminEventImageFile">Обложка мероприятия</label>
         ${draft.image ? `<img class="admin-event-preview" src="${escapeHtml(draft.image)}" alt="Текущая обложка мероприятия" />` : ''}
         <input id="adminEventImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
         <input id="adminEventImage" type="hidden" value="${escapeHtml(draft.image)}" />
-        <label class="sr-only" for="adminEventUrl">Ссылка на регистрацию</label>
-        <input id="adminEventUrl" type="url" placeholder="Ссылка на регистрацию" value="${escapeHtml(draft.url)}" />
+        <label class="admin-field-label" for="adminEventUrl">Ссылка на чат мероприятия</label>
+        <input id="adminEventUrl" type="url" placeholder="Ссылка на чат в MAX" value="${escapeHtml(draft.url)}" />
+        <small class="admin-field-hint">Показывается пользователю только после успешной регистрации как кнопка «Перейти в чат».</small>
         <label class="admin-checkbox">
           <input type="checkbox" id="adminEventActive" ${draft.isActive ? 'checked' : ''} />
           Показывать в приложении
@@ -393,28 +415,35 @@ function adminEventFormSection() {
 }
 
 async function adminPanelView() {
-  const [eventsResult, partnersResult, metricsResult] = await Promise.allSettled([
-    getAdminEvents(),
-    getAdminPartners(),
-    getAdminMetrics(store.adminMetricsRange),
-  ]);
-  if (eventsResult.status === 'fulfilled') {
+  const request = store.adminSection === 'events'
+    ? getAdminEvents()
+    : store.adminSection === 'partners'
+      ? getAdminPartners()
+      : store.adminSection === 'metrics'
+        ? getAdminMetrics(store.adminMetricsRange)
+        : Promise.resolve(null);
+  const result = await Promise.allSettled([request]);
+  const eventsResult = store.adminSection === 'events' ? result[0] : null;
+  const partnersResult = store.adminSection === 'partners' ? result[0] : null;
+  const metricsResult = store.adminSection === 'metrics' ? result[0] : null;
+  if (eventsResult?.status === 'fulfilled') {
     store.adminEvents = eventsResult.value.items;
-  } else {
+  } else if (eventsResult) {
     store.adminEventError = 'Не удалось загрузить мероприятия.';
   }
-  if (partnersResult.status === 'fulfilled') {
+  if (partnersResult?.status === 'fulfilled') {
     store.adminPartners = partnersResult.value.items;
-  } else {
+  } else if (partnersResult) {
     store.adminPartnerError = 'Не удалось загрузить партнеров.';
   }
-  if (metricsResult.status === 'fulfilled') {
+  if (metricsResult?.status === 'fulfilled') {
     store.adminMetrics = metricsResult.value;
     store.adminMetricsError = '';
-  } else {
+  } else if (metricsResult) {
     store.adminMetricsError = 'Не удалось загрузить статистику.';
   }
   const sections = {
+    vacancies: adminVacanciesSection,
     events: adminEventFormSection,
     partners: adminPartnerFormSection,
     metrics: adminMetricsSection,
@@ -424,7 +453,8 @@ async function adminPanelView() {
 }
 
 function favoritesView() {
-  const favorites = vacancies.filter((v) => store.favorites.has(v.id));
+  const favorites = (store.vacancies.length ? store.vacancies : vacancies)
+    .filter((v) => store.favorites.has(v.id));
   return favorites.length
     ? `<section class="list-stack">${favorites.map((v, i) => vacancyCard(v, { compact: true, index: i })).join('')}</section>`
     : emptyState('В избранном пусто', 'Добавляй подходящие вакансии — нажми сердечко на любой карточке.', icons.heartOutline);

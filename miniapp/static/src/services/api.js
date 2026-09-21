@@ -16,7 +16,10 @@ function canUseMockFallback() {
 
 async function request(path) {
   if (!API_BASE) return null;
-  const response = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  const response = await fetch(`${API_BASE}${path}`, { headers: authHeaders(), signal: controller.signal });
+  window.clearTimeout(timeout);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
@@ -212,6 +215,10 @@ export async function getPartnerDepartment(partnerId, departmentId) {
 
 export async function getAdminEvents() {
   return adminRequest('/admin/events');
+}
+
+export async function syncAdminVacancies() {
+  return adminRequest('/admin/vacancies/sync', { method: 'POST' });
 }
 
 export async function createEvent(payload) {

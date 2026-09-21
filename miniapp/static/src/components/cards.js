@@ -87,10 +87,10 @@ export function eventCard(event, index = 0, { registeredView = false } = {}) {
         ${registrationNotice}
         ${adminControls}
         <div class="event-actions">
-          ${badge(event.deadline, 'red-soft deadline')}
+          ${event.deadline ? `<div class="event-deadline">${badge(event.deadline, 'red-soft deadline')}</div>` : ''}
           <div class="event-action-buttons">
             ${registrationButton}
-            ${event.url ? `<button class="icon-btn event-link-button" type="button" data-action="open-link" data-url="${escapeHtml(event.url)}" aria-label="Подробнее о мероприятии">${icons.arrowUpRight}</button>` : ''}
+            ${event.isRegistered && event.url ? `<button class="btn btn-ghost btn-small event-link-button" type="button" data-action="open-link" data-url="${escapeHtml(event.url)}" aria-label="Перейти в чат мероприятия">${icons.arrowUpRight}<span>Перейти в чат</span></button>` : ''}
           </div>
         </div>
       </div>

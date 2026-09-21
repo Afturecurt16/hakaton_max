@@ -5,7 +5,7 @@ export function navigate(path) {
 }
 
 export function parseRoute() {
-  const raw = window.location.hash.replace(/^#/, '') || (store.onboardingSeen ? '/vacancies' : '/onboarding');
+  const raw = window.location.hash.replace(/^#/, '') || '/vacancies';
   const [path, queryString = ''] = raw.split('?');
   const params = new URLSearchParams(queryString);
 
@@ -22,7 +22,7 @@ export function parseRoute() {
   if (path === '/events') return { name: 'events', path, params };
   if (path === '/notifications') return { name: 'notifications', path, params };
   if (path === '/profile/edit' || path === '/profile') return { name: 'profile', path: '/profile', params };
-  if (path === '/onboarding') return { name: 'onboarding', path, params };
+  if (path === '/onboarding') return { name: 'vacancies', path: '/vacancies', params };
   return { name: 'vacancies', path: '/vacancies', params };
 }
 

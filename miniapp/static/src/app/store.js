@@ -1,5 +1,4 @@
 const FAVORITES_KEY = 'kvs-job:favorites';
-const ONBOARDING_KEY = 'kvs-job:onboarding-seen';
 const ADMIN_EMAIL = '253103@edu.fa.ru';
 const PROFILE_EMAIL_KEY = 'kvs-job:profile-email';
 const ADMIN_DEVELOPERS_KEY = 'kvs-job:admin-developers';
@@ -14,12 +13,19 @@ function readList(key) {
   }
 }
 
-function readFavorites() {
+function favoritesKey(email = '') {
+  const normalized = String(email || '').trim().toLowerCase();
+  return normalized ? `${FAVORITES_KEY}:${normalized}` : null;
+}
+
+export function readFavorites(email = '') {
+  const key = favoritesKey(email);
+  if (!key) return new Set();
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(FAVORITES_KEY) || '["sber-data-intern"]');
-    return new Set(Array.isArray(parsed) ? parsed : ['sber-data-intern']);
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]');
+    return new Set(Array.isArray(parsed) ? parsed : []);
   } catch {
-    return new Set(['sber-data-intern']);
+    return new Set();
   }
 }
 
@@ -60,12 +66,17 @@ export const store = {
     vacancyCategory: 'Все',
     eventCategory: 'Все',
   },
+  vacancies: [],
   profileTab: 'resume',
   profileLoginMode: 'button',
-  profileEmail: window.localStorage.getItem(PROFILE_EMAIL_KEY) || '',
+  // Authentication is intentionally session-only. A stale browser storage
+  // value must never open the developer panel for the next person on a shared
+  // MAX/WebView device.
+  profileEmail: '',
   profileEmailError: '',
-  adminMode: 'panel',
+  adminMode: 'profile',
   adminSection: 'events',
+  adminVacancySyncStatus: '',
   adminDevelopers: readList(ADMIN_DEVELOPERS_KEY),
   adminPlaces: readList(ADMIN_PLACES_KEY),
   adminFormError: '',
@@ -84,8 +95,7 @@ export const store = {
   adminMetrics: null,
   adminMetricsRange: 30,
   adminMetricsError: '',
-  favorites: readFavorites(),
-  onboardingSeen: window.localStorage.getItem(ONBOARDING_KEY) === '1',
+  favorites: new Set(),
 };
 
 export function isProfileAuthenticated() {
@@ -108,7 +118,7 @@ export function submitProfileEmail(email) {
     return false;
   }
   store.profileEmail = normalized;
-  window.localStorage.setItem(PROFILE_EMAIL_KEY, normalized);
+  store.favorites = readFavorites(normalized);
   store.profileEmailError = '';
   store.profileLoginMode = 'button';
   store.adminMode = normalized === ADMIN_EMAIL ? 'panel' : 'profile';
@@ -120,6 +130,7 @@ export function logoutProfile() {
   window.localStorage.removeItem(PROFILE_EMAIL_KEY);
   store.profileLoginMode = 'button';
   store.profileEmailError = '';
+  store.favorites = new Set();
   store.adminMode = 'panel';
   store.adminFormError = '';
 }
@@ -186,7 +197,7 @@ export function startEditEvent(event) {
     description: event.description || '',
     deadline: event.deadline || '',
     url: event.url || '',
-    capacity: event.capacity || '',
+    capacity: Number.isInteger(event.capacity) && event.capacity > 0 ? String(event.capacity) : '',
     isActive: event.isActive !== false,
   };
   store.adminEventError = '';
@@ -230,7 +241,8 @@ export function removePartnerDepartment(index) {
 }
 
 export function saveFavorites() {
-  window.localStorage.setItem(FAVORITES_KEY, JSON.stringify([...store.favorites]));
+  const key = favoritesKey(store.profileEmail);
+  if (key) window.localStorage.setItem(key, JSON.stringify([...store.favorites]));
 }
 
 export function toggleFavorite(id) {
@@ -243,6 +255,5 @@ export function toggleFavorite(id) {
 }
 
 export function markOnboardingSeen() {
-  store.onboardingSeen = true;
-  window.localStorage.setItem(ONBOARDING_KEY, '1');
+  // Kept as a harmless compatibility export for older client bundles.
 }

@@ -50,7 +50,7 @@ from database.models import (
 )
 from services.max_bot import MaxApiError, max_bot
 from services.partner_defaults import KEPT_PARTNER, VK_ECOSYSTEM_PARTNERS, VK_PARTNER
-from services.vacancy_scheduler import run_daily_vacancy_sync_scheduler
+from services.vacancy_scheduler import run_vacancy_sync_job, run_daily_vacancy_sync_scheduler
 
 from .services.max_auth import extract_user_id, verify_init_data
 from .services.analytics import build_metrics_dashboard, export_metrics_csv
@@ -1265,6 +1265,19 @@ async def admin_delete_event(
     await session.delete(event)
     await session.commit()
     return None
+
+
+@app.post("/api/v1/admin/vacancies/sync")
+async def admin_sync_vacancies(
+    admin_id: int = Depends(require_admin),
+):
+    """Refresh the database snapshot from the configured Google Sheet."""
+    del admin_id
+    try:
+        source_count = await run_vacancy_sync_job()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Не удалось обновить вакансии: {exc}") from exc
+    return {"sourceCount": source_count, "status": "ready"}
 
 
 @app.get("/api/v1/vacancies")

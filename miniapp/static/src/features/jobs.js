@@ -22,6 +22,7 @@ export async function renderJobs() {
       query: store.filters.vacancyQuery,
       category: store.filters.vacancyCategory,
     });
+    store.vacancies = data.items || [];
 
     if (data.maintenance) {
       return appShell(

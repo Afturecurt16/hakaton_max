@@ -21,7 +21,6 @@ import { icons } from '../components/icons.js';
 import { appShell, button, emptyState } from '../components/ui.js';
 import { renderEvents, renderEventsLoading } from '../features/events.js';
 import { renderJobs, renderJobsLoading } from '../features/jobs.js';
-import { renderOnboarding, startOnboarding } from '../features/onboarding.js';
 import { renderNotifications, renderNotificationsLoading } from '../features/notifications.js';
 import {
   renderDepartmentDetail,
@@ -38,9 +37,11 @@ import {
   deleteEvent,
   deletePartner,
   downloadAdminMetrics,
+  getAdminEvents,
   getSubscriptionStatus,
   registerEvent,
   sendEventMessage,
+  syncAdminVacancies,
   trackMetric,
   unregisterEvent,
   uploadEventImage,
@@ -111,7 +112,7 @@ function haptic(type = 'light') {
 /* ─── Navigation direction & view transitions ─────────────────── */
 // Route "depth": deeper routes slide in (push), shallower slide out (pop),
 // same-level tab switches slide sideways following the tab order.
-const ROUTE_LEVELS = { onboarding: 0, vacancies: 1, partners: 1, events: 1, profile: 1, notifications: 2, 'vacancy-detail': 2, 'partner-detail': 2, 'department-detail': 3 };
+const ROUTE_LEVELS = { vacancies: 1, partners: 1, events: 1, profile: 1, notifications: 2, 'vacancy-detail': 2, 'partner-detail': 2, 'department-detail': 3 };
 const TAB_ORDER = { vacancies: 0, partners: 1, events: 2, profile: 3 };
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 const scrollMemory = new Map();
@@ -235,7 +236,6 @@ function loadingFor(route) {
   if (route.name === 'notifications') return renderNotificationsLoading();
   if (route.name === 'profile') return renderProfileLoading();
   if (route.name === 'vacancy-detail') return renderVacancyDetailLoading();
-  if (route.name === 'onboarding') return renderOnboarding();
   return renderJobsLoading();
 }
 
@@ -247,7 +247,6 @@ async function viewFor(route) {
   if (route.name === 'notifications') return renderNotifications();
   if (route.name === 'profile') return renderProfile(route);
   if (route.name === 'vacancy-detail') return renderVacancyDetail(route.id);
-  if (route.name === 'onboarding') return renderOnboarding();
   return renderJobs();
 }
 
@@ -401,7 +400,6 @@ document.addEventListener('click', (e) => {
 
   if (action === 'navigate') navigate(target.dataset.route);
   if (action === 'back') goBack();
-  if (action === 'start-onboarding') startOnboarding(navigate);
   if (action === 'open-link' || action === 'apply') openExternal(target.dataset.url);
   if (action === 'share-vacancy') shareVacancy(target.dataset.url);
   if (action === 'open-max-channel') {
@@ -468,6 +466,24 @@ document.addEventListener('click', (e) => {
   if (action === 'set-admin-section') {
     store.adminSection = target.dataset.value || 'events';
     render();
+  }
+
+  if (action === 'sync-admin-vacancies') {
+    target.disabled = true;
+    store.adminVacancySyncStatus = 'Загружаем вакансии из Google Таблицы…';
+    render();
+    syncAdminVacancies()
+      .then((result) => {
+        store.adminVacancySyncStatus = `Готово: загружено вакансий — ${result.sourceCount || 0}.`;
+        showToast(`Вакансии обновлены: ${result.sourceCount || 0}`, icons.check);
+        render();
+      })
+      .catch((error) => {
+        store.adminVacancySyncStatus = error.message || 'Не удалось обновить вакансии.';
+        target.disabled = false;
+        showToast(error.message || 'Не удалось обновить вакансии', icons.link);
+        render();
+      });
   }
 
   if (action === 'add-admin-developer') {
@@ -626,8 +642,13 @@ document.addEventListener('click', (e) => {
 
   if (action === 'edit-admin-event') {
     const eventToEdit = store.adminEvents.find((item) => item.id === target.dataset.id);
-    if (eventToEdit) {
-      startEditEvent(eventToEdit);
+    const openEditor = (event) => {
+      if (!event) {
+        maxBridge?.HapticFeedback?.notificationOccurred?.('error');
+        showToast('Не удалось открыть мероприятие для редактирования', icons.link);
+        return;
+      }
+      startEditEvent(event);
       store.adminMode = 'panel';
       // This button also lives on public event cards (Мероприятия tab) now —
       // the edit *form* only exists in the admin panel, so jump there when
@@ -638,11 +659,23 @@ document.addEventListener('click', (e) => {
       } else {
         navigate('/profile');
       }
+    };
+
+    // Public event cards intentionally omit capacity. Fetch the administrator
+    // version before opening the form, otherwise saving would erase the limit.
+    if (!Number.isInteger(eventToEdit?.capacity)) {
+      target.disabled = true;
+      getAdminEvents()
+        .then((data) => {
+          store.adminEvents = data.items || [];
+          openEditor(store.adminEvents.find((item) => item.id === target.dataset.id));
+        })
+        .catch((error) => {
+          showToast(error.message || 'Не удалось загрузить лимит мероприятия', icons.link);
+        })
+        .finally(() => { target.disabled = false; });
     } else {
-      // store.adminEvents is only stale if the list fetch failed or hasn't
-      // resolved yet — surface that instead of silently doing nothing.
-      maxBridge?.HapticFeedback?.notificationOccurred?.('error');
-      showToast('Не удалось открыть мероприятие для редактирования', icons.link);
+      openEditor(eventToEdit);
     }
   }
 
@@ -724,6 +757,12 @@ document.addEventListener('click', (e) => {
   if (action === 'toggle-favorite') {
     e.preventDefault();
     e.stopPropagation();
+    if (!store.profileEmail) {
+      startProfileLogin();
+      showToast('Сначала войдите по почте, чтобы сохранять вакансии', icons.user);
+      navigate('/profile');
+      return;
+    }
     const id = target.dataset.id;
     toggleFavorite(id);
     const active = store.favorites.has(id);
