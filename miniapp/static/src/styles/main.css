@@ -217,106 +217,6 @@ svg {
 .nav-item:active,
 .heart-btn:active { transform: scale(0.97); }
 
-/* ─── Onboarding ──────────────────────────────────────────────── */
-.onboarding-screen {
-  display: flex;
-  min-height: 100vh;
-  flex-direction: column;
-  gap: 28px;
-  padding: calc(60px + env(safe-area-inset-top)) 24px calc(36px + env(safe-area-inset-bottom));
-  background: var(--color-surface);
-  animation: screen-in var(--dur-mid) var(--ease) both;
-}
-
-.brand-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  font-size: 30px;
-  font-weight: 850;
-  letter-spacing: -0.01em;
-}
-
-.brand-mark {
-  display: grid;
-  width: 50px;
-  height: 50px;
-  place-items: center;
-  border-radius: 15px;
-  background: var(--color-primary);
-  color: #fff;
-}
-
-.welcome-card {
-  position: relative;
-  overflow: hidden;
-  min-height: 272px;
-  border-radius: 22px;
-  isolation: isolate;
-}
-
-.welcome-card img,
-.welcome-overlay { position: absolute; inset: 0; }
-
-.welcome-card img { width: 100%; height: 100%; object-fit: cover; }
-
-.welcome-overlay {
-  z-index: 1;
-  background: linear-gradient(135deg, rgba(196, 0, 22, 0.84), rgba(41, 41, 39, 0.72));
-}
-
-.welcome-copy {
-  position: absolute;
-  right: 24px;
-  bottom: 28px;
-  left: 24px;
-  z-index: 2;
-  color: #fff;
-}
-
-.welcome-copy h1 {
-  margin: 0;
-  max-width: 260px;
-  font-size: 38px;
-  font-weight: 850;
-  line-height: 1.08;
-}
-
-.welcome-copy p {
-  max-width: 285px;
-  margin: 16px 0 0;
-  font-size: 18px;
-  line-height: 1.38;
-  opacity: 0.9;
-}
-
-.benefits { display: grid; gap: 20px; }
-
-.benefits article {
-  display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 16px;
-  align-items: center;
-}
-
-.benefits svg {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  background: var(--color-surface-muted);
-  color: var(--color-primary);
-  padding: 14px;
-}
-
-.benefits strong,
-.benefits span { display: block; }
-
-.benefits strong { font-size: 20px; line-height: 1.18; }
-.benefits span { margin-top: 3px; color: var(--color-muted); font-size: 17px; line-height: 1.25; }
-
-.onboarding-actions { display: grid; gap: 12px; margin-top: auto; }
-
 /* ─── Search ──────────────────────────────────────────────────── */
 .search-field {
   display: grid;
@@ -1988,7 +1888,6 @@ input:focus-visible {
 @media (max-width: 374px) {
   .screen { padding-right: 12px; padding-left: 12px; }
   .screen-header h1 { font-size: 34px; }
-  .onboarding-screen { padding-right: 18px; padding-left: 18px; }
   .btn { font-size: 18px; }
   .form-grid { grid-template-columns: 1fr; }
   .vacancy-card { padding: 18px 12px 14px; }
@@ -2007,7 +1906,6 @@ input:focus-visible {
 @supports (view-transition-name: none) {
   /* View transitions drive screen motion; the fallback fade would double it. */
   .screen,
-  .onboarding-screen,
   .detail-screen { animation: none; }
 
   /* Fixed chrome stays put while the page content slides underneath. */
@@ -2181,14 +2079,6 @@ html[data-nav="tab-back"]::view-transition-new(root)    { animation-name: vt-fad
   justify-content: center;
   margin-top: 10px;
 }
-
-/* ─── Onboarding stagger ──────────────────────────────────────── */
-.welcome-card { animation: card-in 320ms var(--ease) both; }
-.benefits article { animation: card-in 320ms var(--ease) both; }
-.benefits article:nth-child(1) { animation-delay: 80ms; }
-.benefits article:nth-child(2) { animation-delay: 150ms; }
-.benefits article:nth-child(3) { animation-delay: 220ms; }
-.onboarding-actions { animation: card-in 320ms var(--ease) both; animation-delay: 290ms; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -253,7 +253,3 @@ export function toggleFavorite(id) {
   }
   saveFavorites();
 }
-
-export function markOnboardingSeen() {
-  // Kept as a harmless compatibility export for older client bundles.
-}
