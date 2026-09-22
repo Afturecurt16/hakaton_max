@@ -60,7 +60,6 @@ vacancies.csv
 logs/
 
 # Docker
-.dockerignore
 .docker-local/
 
 # Local deployment archives
