@@ -214,6 +214,45 @@ def _registration_owner_filter(user_id: int | None, profile_email: str | None):
     return or_(*conditions) if conditions else None
 
 
+async def _backfill_registration_identity(
+    registrations: list[MiniappEventRegistration],
+    user_id: int | None,
+    profile_email: str | None,
+    session: AsyncSession,
+) -> None:
+    """Attach a verified MAX id to an earlier email-only registration."""
+    changed = False
+    for registration in registrations:
+        if registration.max_user_id is None and user_id is not None:
+            conflict = (
+                await session.execute(
+                    select(MiniappEventRegistration.id).where(
+                        MiniappEventRegistration.event_id == registration.event_id,
+                        MiniappEventRegistration.max_user_id == user_id,
+                        MiniappEventRegistration.id != registration.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if conflict is None:
+                registration.max_user_id = user_id
+                changed = True
+        if registration.profile_email is None and profile_email:
+            conflict = (
+                await session.execute(
+                    select(MiniappEventRegistration.id).where(
+                        MiniappEventRegistration.event_id == registration.event_id,
+                        MiniappEventRegistration.profile_email == profile_email,
+                        MiniappEventRegistration.id != registration.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if conflict is None:
+                registration.profile_email = profile_email
+                changed = True
+    if changed:
+        await session.commit()
+
+
 class EventPayload(BaseModel):
     category: str = "Другое"
     format: str = "Офлайн"
@@ -932,6 +971,7 @@ async def list_events(
                 )
             )
         ).scalars().all()
+        await _backfill_registration_identity(rows, user_id, profile_email, session)
         registrations = {row.event_id: row for row in rows}
     all_items = []
     for event in events:
@@ -976,8 +1016,15 @@ async def list_my_events(
         )
         .order_by(MiniappEvent.starts_at.asc().nullslast(), MiniappEvent.created_at.desc())
     )
+    event_registrations = result.all()
+    await _backfill_registration_identity(
+        [registration for _, registration in event_registrations],
+        user_id,
+        profile_email,
+        session,
+    )
     items = []
-    for event, registration in result.all():
+    for event, registration in event_registrations:
         item = _event_to_frontend(
             event,
             registration=registration,
@@ -1290,20 +1337,25 @@ async def admin_message_event_participants(
     event = await session.get(MiniappEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    conditions = [
-        MiniappEventRegistration.event_id == event_id,
-        MiniappEventRegistration.max_user_id.is_not(None),
-    ]
+    conditions = [MiniappEventRegistration.event_id == event_id]
     if payload.audience != "all":
         conditions.append(MiniappEventRegistration.status == payload.audience)
-    recipients = list(
+    registrations = list(
         (
             await session.execute(
-                select(MiniappEventRegistration.max_user_id)
+                select(MiniappEventRegistration)
                 .where(*conditions)
                 .order_by(MiniappEventRegistration.id)
             )
         ).scalars()
+    )
+    recipients = list(dict.fromkeys(
+        registration.max_user_id
+        for registration in registrations
+        if registration.max_user_id is not None
+    ))
+    unavailable = sum(
+        1 for registration in registrations if registration.max_user_id is None
     )
     sent = 0
     failed = 0
@@ -1320,7 +1372,13 @@ async def admin_message_event_participants(
             logging.getLogger(__name__).warning(
                 "Cannot deliver admin MAX message to %s: %s", user_id, exc
             )
-    return {"total": len(recipients), "sent": sent, "failed": failed}
+    return {
+        "total": len(registrations),
+        "deliverable": len(recipients),
+        "sent": sent,
+        "failed": failed,
+        "unavailable": unavailable,
+    }
 
 
 @app.delete("/api/v1/admin/events/{event_id}", status_code=204)

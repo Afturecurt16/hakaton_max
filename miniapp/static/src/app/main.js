@@ -700,8 +700,12 @@ document.addEventListener('click', (e) => {
       target.disabled = true;
       sendEventMessage(target.dataset.id, { text, audience })
         .then((result) => {
-          maxBridge?.HapticFeedback?.notificationOccurred?.('success');
-          showToast(`Отправлено в MAX: ${result.sent} из ${result.total}`, icons.mail);
+          const unavailable = Number(result.unavailable || 0);
+          maxBridge?.HapticFeedback?.notificationOccurred?.(result.sent ? 'success' : 'warning');
+          const message = unavailable
+            ? `Отправлено в MAX: ${result.sent} из ${result.total}. Без MAX ID: ${unavailable}`
+            : `Отправлено в MAX: ${result.sent} из ${result.total}`;
+          showToast(message, icons.mail);
           if (row?.querySelector('[data-event-message-text]')) row.querySelector('[data-event-message-text]').value = '';
           target.disabled = false;
         })
