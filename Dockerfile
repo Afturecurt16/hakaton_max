@@ -11,6 +11,12 @@ COPY requirements.txt .
 RUN python -m pip install --upgrade pip \
     && python -m pip install --prefer-binary -r requirements.txt
 
+# MAX API uses the Russian Trusted CA chain, which is absent from the base
+# image. Fetch the official PEM files once at build time; only the MAX client
+# uses this bundle, so other outbound HTTPS connections keep their usual trust.
+COPY scripts/install_max_ca.py /tmp/install_max_ca.py
+RUN python /tmp/install_max_ca.py
+
 COPY . .
 RUN chmod +x /app/scripts/entrypoint.sh
 

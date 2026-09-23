@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import ssl
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from config import (
@@ -17,6 +19,9 @@ from config import (
 
 class MaxApiError(RuntimeError):
     pass
+
+
+MAX_CA_BUNDLE = Path(__file__).resolve().parents[1] / "certs" / "russian_trusted_ca.pem"
 
 
 @dataclass(frozen=True)
@@ -59,7 +64,10 @@ class MaxBotClient:
             },
         )
         try:
-            with urlopen(request, timeout=15) as response:
+            context = ssl.create_default_context()
+            if urlsplit(self.base_url).hostname == "platform-api2.max.ru" and MAX_CA_BUNDLE.is_file():
+                context.load_verify_locations(cafile=str(MAX_CA_BUNDLE))
+            with urlopen(request, timeout=15, context=context) as response:
                 raw = response.read()
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:500]
