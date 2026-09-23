@@ -116,11 +116,15 @@ class MiniappEvent(Base):
 
 class MiniappEventRegistration(Base):
     __tablename__ = "miniapp_event_registrations"
-    __table_args__ = (UniqueConstraint("event_id", "max_user_id", name="uq_miniapp_event_registration_max"),)
+    __table_args__ = (
+        UniqueConstraint("event_id", "max_user_id", name="uq_miniapp_event_registration_max"),
+        UniqueConstraint("event_id", "profile_email", name="uq_miniapp_event_registration_email"),
+    )
 
     id = Column(Integer, primary_key=True)
     event_id = Column(Integer, ForeignKey("miniapp_events.id", ondelete="CASCADE"), nullable=False, index=True)
-    max_user_id = Column(BigInteger, nullable=False, index=True)
+    max_user_id = Column(BigInteger, nullable=True, index=True)
+    profile_email = Column(String(320), nullable=True, index=True)
     status = Column(String(20), nullable=False, default="confirmed", index=True)
     promoted_at = Column(DateTime(timezone=True))
     reminder_day_sent_at = Column(DateTime(timezone=True))

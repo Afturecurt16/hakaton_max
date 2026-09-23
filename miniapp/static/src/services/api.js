@@ -19,20 +19,16 @@ async function request(path) {
   if (!API_BASE) return null;
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 8000);
-  const response = await fetch(`${API_BASE}${path}`, { headers: authHeaders(), signal: controller.signal });
+  const response = await fetch(`${API_BASE}${path}`, { headers: profileAuthHeaders(), signal: controller.signal });
   window.clearTimeout(timeout);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
 
 async function userRequest(path, { method = 'GET' } = {}) {
-  const profileEmail = store.profileEmail || '';
   const response = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: {
-      ...authHeaders(),
-      ...(profileEmail ? { 'X-Profile-Email': profileEmail } : {}),
-    },
+    headers: profileAuthHeaders(),
   });
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
@@ -61,6 +57,14 @@ function authHeaders() {
   }
   const initData = window.WebApp?.initData?.trim() || window.KVS_MAX_INIT_DATA || cachedData;
   return initData ? { 'X-Max-Init-Data': initData } : {};
+}
+
+function profileAuthHeaders() {
+  const email = store.profileEmail || '';
+  return {
+    ...authHeaders(),
+    ...(email ? { 'X-Profile-Email': email } : {}),
+  };
 }
 
 function adminAuthHeaders() {

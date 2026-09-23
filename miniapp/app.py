@@ -28,7 +28,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -188,16 +188,30 @@ async def require_miniapp_user(
     return user_id
 
 
+def _normalize_profile_email(value: str) -> str | None:
+    email = value.strip().casefold()
+    return email if re.fullmatch(r"[a-z0-9._%+\-]+@edu\.fa\.ru", email) else None
+
+
 def require_profile_email(
     x_profile_email: str = Header(default="", alias="X-Profile-Email"),
 ) -> str:
-    email = x_profile_email.strip().casefold()
-    if not re.fullmatch(r"[a-z0-9._%+\-]+@edu\.fa\.ru", email):
+    email = _normalize_profile_email(x_profile_email)
+    if email is None:
         raise HTTPException(
             status_code=401,
             detail="Нужно зарегистрироваться в профиле",
         )
     return email
+
+
+def _registration_owner_filter(user_id: int | None, profile_email: str | None):
+    conditions = []
+    if user_id is not None:
+        conditions.append(MiniappEventRegistration.max_user_id == user_id)
+    if profile_email:
+        conditions.append(MiniappEventRegistration.profile_email == profile_email)
+    return or_(*conditions) if conditions else None
 
 
 class EventPayload(BaseModel):
@@ -896,9 +910,11 @@ async def list_events(
     request: Request,
     category: str = Query(default="Все", max_length=120),
     x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    x_profile_email: str = Header(default="", alias="X-Profile-Email"),
     session: AsyncSession = Depends(get_session),
 ):
     user_id = _resolve_miniapp_user(request, x_max_init_data)
+    profile_email = _normalize_profile_email(x_profile_email)
     result = await session.execute(
         select(MiniappEvent)
         .where(MiniappEvent.is_active.is_(True))
@@ -906,11 +922,12 @@ async def list_events(
     )
     events = result.scalars().all()
     registrations: dict[int, MiniappEventRegistration] = {}
-    if user_id is not None and events:
+    owner_filter = _registration_owner_filter(user_id, profile_email)
+    if owner_filter is not None and events:
         rows = (
             await session.execute(
                 select(MiniappEventRegistration).where(
-                    MiniappEventRegistration.max_user_id == user_id,
+                    owner_filter,
                     MiniappEventRegistration.event_id.in_([event.id for event in events]),
                 )
             )
@@ -940,9 +957,13 @@ async def list_events(
 
 @app.get("/api/v1/me/events")
 async def list_my_events(
-    user_id: int = Depends(require_miniapp_user),
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    profile_email: str = Depends(require_profile_email),
     session: AsyncSession = Depends(get_session),
 ):
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
+    owner_filter = _registration_owner_filter(user_id, profile_email)
     result = await session.execute(
         select(MiniappEvent, MiniappEventRegistration)
         .join(
@@ -950,7 +971,7 @@ async def list_my_events(
             MiniappEventRegistration.event_id == MiniappEvent.id,
         )
         .where(
-            MiniappEventRegistration.max_user_id == user_id,
+            owner_filter,
             MiniappEvent.is_active.is_(True),
         )
         .order_by(MiniappEvent.starts_at.asc().nullslast(), MiniappEvent.created_at.desc())
@@ -970,12 +991,14 @@ async def list_my_events(
 @app.post("/api/v1/events/{event_id}/register", status_code=201)
 async def register_for_event(
     event_id: int,
-    user_id: int = Depends(require_miniapp_user),
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
     profile_email: str = Depends(require_profile_email),
     session: AsyncSession = Depends(get_session),
 ):
-    del profile_email
-    await _require_max_subscription(user_id)
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
+    if user_id is not None:
+        await _require_max_subscription(user_id)
     event = (
         await session.execute(
             select(MiniappEvent).where(MiniappEvent.id == event_id).with_for_update()
@@ -996,7 +1019,7 @@ async def register_for_event(
         await session.execute(
             select(MiniappEventRegistration).where(
                 MiniappEventRegistration.event_id == event_id,
-                MiniappEventRegistration.max_user_id == user_id,
+                _registration_owner_filter(user_id, profile_email),
             )
         )
     ).scalar_one_or_none()
@@ -1015,13 +1038,27 @@ async def register_for_event(
         registration = MiniappEventRegistration(
             event_id=event_id,
             max_user_id=user_id,
+            profile_email=profile_email,
             status=status,
         )
         session.add(registration)
         await session.commit()
         await session.refresh(registration)
-        notification_sent = await _notify_registration(user_id, event, status)
+        notification_sent = (
+            await _notify_registration(user_id, event, status)
+            if user_id is not None
+            else False
+        )
     else:
+        registration_changed = False
+        if registration.profile_email is None:
+            registration.profile_email = profile_email
+            registration_changed = True
+        if registration.max_user_id is None and user_id is not None:
+            registration.max_user_id = user_id
+            registration_changed = True
+        if registration_changed:
+            await session.commit()
         notification_sent = True
     item = _event_to_frontend(
         event,
@@ -1035,9 +1072,12 @@ async def register_for_event(
 @app.delete("/api/v1/events/{event_id}/register", status_code=204)
 async def unregister_from_event(
     event_id: int,
-    user_id: int = Depends(require_miniapp_user),
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    profile_email: str = Depends(require_profile_email),
     session: AsyncSession = Depends(get_session),
 ):
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
     event = (
         await session.execute(
             select(MiniappEvent).where(MiniappEvent.id == event_id).with_for_update()
@@ -1049,7 +1089,7 @@ async def unregister_from_event(
         await session.execute(
             select(MiniappEventRegistration).where(
                 MiniappEventRegistration.event_id == event_id,
-                MiniappEventRegistration.max_user_id == user_id,
+                _registration_owner_filter(user_id, profile_email),
             )
         )
     ).scalar_one_or_none()
