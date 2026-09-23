@@ -38,6 +38,7 @@ import {
   deletePartner,
   downloadAdminMetrics,
   getAdminEvents,
+  getMaxAppLink,
   getMyEvents,
   getSubscriptionStatus,
   registerEvent,
@@ -407,6 +408,10 @@ document.addEventListener('click', (e) => {
     const url = store.subscription.channelUrl;
     if (url) maxBridge?.openMaxLink ? maxBridge.openMaxLink(url) : window.open(url, '_blank', 'noopener');
   }
+  if (action === 'open-max-app' && store.maxAppLink) {
+    if (window.WebApp?.openMaxLink) window.WebApp.openMaxLink(store.maxAppLink);
+    else window.location.assign(store.maxAppLink);
+  }
   if (action === 'check-max-subscription') {
     target.disabled = true;
     store.subscription.checked = false;
@@ -464,12 +469,22 @@ document.addEventListener('click', (e) => {
       getMyEvents().then((data) => {
         store.myEvents = data.items || [];
         store.notificationsCount = Number(data.total || store.myEvents.length);
+        store.maxAuthStatus = data.maxAuthStatus || '';
         if (data.maxAuthStatus === 'missing')
           showToast('MAX не передал ID. Откройте приложение через кнопку бота в MAX.', icons.link);
         if (data.maxAuthStatus === 'invalid')
           showToast('MAX ID не подтверждён. Перезапустите приложение; если ошибка повторится, проверьте токен бота.', icons.link);
         if (data.maxAuthStatus === 'not_configured')
           showToast('На сервере не настроен токен MAX-бота.', icons.link);
+        if (['missing', 'invalid'].includes(data.maxAuthStatus)) {
+          getMaxAppLink().then((link) => {
+            store.maxAppLink = link?.url || '';
+          }).catch((error) => {
+            console.warn('Could not get MAX Mini App launch link', error);
+          }).finally(() => render({ silent: true }));
+        } else {
+          render({ silent: true });
+        }
       }).catch((error) => {
         console.warn('Could not check MAX registration link', error);
       });
@@ -818,4 +833,14 @@ document.addEventListener('click', (e) => {
 });
 
 window.addEventListener('hashchange', () => render());
+window.addEventListener('kvs:max-data-ready', () => {
+  if (!store.profileEmail) return;
+  getMyEvents().then((data) => {
+    store.myEvents = data.items || [];
+    store.notificationsCount = Number(data.total || store.myEvents.length);
+    store.maxAuthStatus = data.maxAuthStatus || '';
+    if (data.maxAuthStatus === 'verified') store.maxAppLink = '';
+    render({ silent: true });
+  }).catch((error) => console.warn('Could not refresh MAX identity', error));
+});
 render();

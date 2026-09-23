@@ -22,6 +22,7 @@ function preserveMaxInitData() {
   const initData = bridgeData || launchData || cachedData;
   if (!initData) return;
 
+  const changed = window.KVS_MAX_INIT_DATA !== initData;
   window.KVS_MAX_INIT_DATA = initData;
   if (bridgeData || launchData) {
     try {
@@ -30,7 +31,12 @@ function preserveMaxInitData() {
       /* The in-memory value is still sufficient for the current page. */
     }
   }
+  if (changed) window.dispatchEvent(new Event('kvs:max-data-ready'));
 }
+
+// Some MAX clients publish launch parameters after the document has loaded.
+window.addEventListener('hashchange', preserveMaxInitData);
+window.addEventListener('pageshow', preserveMaxInitData);
 
 function startApplication() {
   if (started) return;

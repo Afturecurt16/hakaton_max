@@ -17,6 +17,15 @@
     <link rel="preload" href="/assets/images/fin-career-hero.jpg" as="image" />
     <link rel="preload" href="/assets/images/menu_picture.jpg" as="image" />
     <link rel="stylesheet" href="/static/src/styles/main.css" />
+    <script>
+      // Keep MAX launch data before the bridge or SPA navigation changes the URL fragment.
+      (function () {
+        var data = new URLSearchParams(window.location.hash.slice(1)).get('WebAppData');
+        if (!data) return;
+        window.KVS_MAX_INIT_DATA = data;
+        try { window.sessionStorage.setItem('kvs-job:max-init-data', data); } catch (_) {}
+      })();
+    </script>
     <script src="https://st.max.ru/js/max-web-app.js"></script>
     <script type="module" src="/static/src/app/bootstrap.js"></script>
   </head>

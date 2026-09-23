@@ -1,4 +1,4 @@
-import { companyLogo } from '../components/cards.js';
+import { companyLogo, departmentLogo } from '../components/cards.js';
 import { icons } from '../components/icons.js';
 import { appShell, emptyState, errorState, escapeHtml, iconButton, skeletonList, topTitle } from '../components/ui.js';
 import { getPartner, getPartnerDepartment, getPartners } from '../services/api.js';
@@ -37,7 +37,7 @@ function childCompanyCard(parentId, company, index) {
 function departmentCard(partnerId, department, index) {
   return `
     <article class="department-card" style="--i:${index}">
-      <span class="department-number">${String(index + 1).padStart(2, '0')}</span>
+      ${departmentLogo(department.name)}
       <div>
         <h3>${escapeHtml(department.name)}</h3>
         <p>${escapeHtml(department.description)}</p>
@@ -117,12 +117,6 @@ export async function renderPartnerDetail(id) {
 export async function renderDepartmentDetail(partnerId, departmentId) {
   try {
     const department = await getPartnerDepartment(partnerId, departmentId);
-    const company = {
-      name: department.companyName,
-      logoUrl: department.companyLogoUrl,
-      initial: department.companyName?.slice(0, 1) || 'К',
-      brandColor: '#c40016',
-    };
     return appShell(
       `
       <header class="partner-detail-head">
@@ -130,7 +124,7 @@ export async function renderDepartmentDetail(partnerId, departmentId) {
         <span>${escapeHtml(department.companyName)}</span>
       </header>
       <article class="department-detail-identity">
-        ${companyLogo(company)}
+        ${departmentLogo(department.name, 'large')}
         <p>${escapeHtml(department.companyName)}</p>
         <h1>${escapeHtml(department.name)}</h1>
       </article>

@@ -11,6 +11,7 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 # This package is imported two different ways depending on how the server is
 # launched: with kvs_career_bot/ itself as the working directory (main.py's
@@ -69,6 +70,20 @@ EVENT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="KVS Job Miniapp")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+
+
+@app.get("/api/v1/max/app-link")
+async def max_app_link():
+    """Give the browser a native MAX launch link for the configured bot."""
+    try:
+        bot = await max_bot.request("GET", "/me")
+    except MaxApiError as exc:
+        logging.getLogger(__name__).warning("Cannot resolve MAX bot link: %s", exc)
+        raise HTTPException(status_code=503, detail="Не удалось получить ссылку на MAX-бота") from exc
+    username = str(bot.get("username") or "").lstrip("@")
+    if not username:
+        raise HTTPException(status_code=503, detail="У MAX-бота не указан username")
+    return {"url": f"https://max.ru/{quote(username, safe='')}?startapp=notifications"}
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -553,7 +568,9 @@ async def _get_partner_children(
 @app.middleware("http")
 async def disable_static_cache(request, call_next):
     response = await call_next(request)
-    if request.url.path in {"/", "/miniapp"} or request.url.path.startswith("/static/src/"):
+    if (request.url.path in {"/", "/miniapp"}
+            or request.url.path.startswith("/static/src/")
+            or request.url.path.startswith("/assets/images/logos/")):
         response.headers["Cache-Control"] = "no-store"
     return response
 

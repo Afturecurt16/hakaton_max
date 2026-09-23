@@ -2,7 +2,36 @@ import { isAdminProfile, store } from '../app/store.js';
 import { icons } from './icons.js';
 import { badge, escapeHtml } from './ui.js';
 
+// Older database rows still point every VK product at the same generic VK
+// logo. Give those placeholders distinct product marks without replacing a
+// custom logo that an administrator has set.
+const vkProductMarks = {
+  'ВКонтакте': ['ВК', '#0077ff'],
+  'Одноклассники': ['OK', '#f58220'],
+  'Дзен': ['Д', '#171717'],
+  'VK Видео': ['VI', '#7856ff'],
+  'VK Play': ['PL', '#704bde'],
+  'VK Cloud': ['CL', '#2286eb'],
+  'VK Education': ['ED', '#0088bc'],
+  'Учи.ру': ['У', '#ed5b5b'],
+};
+
+function textMark(text, color, size = '', extraClass = '') {
+  return `<span class="company-logo company-logo-mark ${extraClass} ${size}" style="--brand:${color}" aria-hidden="true">${escapeHtml(text)}</span>`;
+}
+
+export function departmentLogo(name, size = '') {
+  const value = String(name || '').trim();
+  const words = value.split(/\s+/).filter(Boolean);
+  const initials = (words.length > 1 ? words[0][0] + words[1][0] : value.slice(0, 2)).toUpperCase() || 'Д';
+  const colors = ['#3268c5', '#8054bb', '#16847c', '#b85b42', '#ad667f', '#5567aa'];
+  const hash = Array.from(value).reduce((sum, char) => sum + char.codePointAt(0), 0);
+  return textMark(initials, colors[hash % colors.length], size, 'department-logo');
+}
+
 export function companyLogo(company, size = '') {
+  const productMark = company.logoUrl === '/assets/images/logos/vk.svg' && vkProductMarks[company.name];
+  if (productMark) return textMark(productMark[0], productMark[1], size, 'vk-product-logo');
   if (company.logoUrl) {
     // Explicit width/height (not just CSS) stop the browser from ever laying the
     // <img> out at its native intrinsic size — or the ~300x150 broken-image

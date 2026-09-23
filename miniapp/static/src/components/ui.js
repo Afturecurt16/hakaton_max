@@ -11,7 +11,18 @@ export function escapeHtml(value) {
 }
 
 export function appShell(content, { nav = false, className = '' } = {}) {
-  return `<main class="screen ${className}">${content}</main>${nav ? bottomNav() : ''}`;
+  const needsMax = store.profileEmail && ['missing', 'invalid', 'not_configured'].includes(store.maxAuthStatus);
+  const maxNotice = needsMax && ['profile', 'events'].includes(store.route?.name)
+    ? `<aside class="max-connect-notice" role="status">
+        <span>${store.maxAuthStatus === 'missing'
+          ? 'MAX не передал ID. Уведомления о мероприятиях пока недоступны.'
+          : store.maxAuthStatus === 'invalid'
+            ? 'MAX ID не подтверждён. Откройте приложение заново через бота.'
+            : 'На сервере не настроен токен MAX-бота.'}</span>
+        ${store.maxAppLink ? button('Открыть через MAX', { action: 'open-max-app', icon: icons.arrowUpRight }) : ''}
+      </aside>`
+    : '';
+  return `<main class="screen ${className}">${maxNotice}${content}</main>${nav ? bottomNav() : ''}`;
 }
 
 export function button(label, { variant = 'primary', action = '', route = '', url = '', disabled = false, icon = icons.arrowRight } = {}) {

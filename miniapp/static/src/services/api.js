@@ -183,6 +183,10 @@ export async function getMyEvents() {
   }
 }
 
+export async function getMaxAppLink() {
+  return request('/max/app-link');
+}
+
 export async function registerEvent(id) {
   return userRequest(`/events/${encodeURIComponent(id)}/register`, { method: 'POST' });
 }
