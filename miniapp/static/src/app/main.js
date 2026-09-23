@@ -417,7 +417,6 @@ document.addEventListener('click', (e) => {
     if (!store.profileEmail) {
       maxBridge?.HapticFeedback?.notificationOccurred?.('warning');
       startProfileLogin();
-      showToast('Сначала зарегистрируйтесь в профиле', icons.user);
       navigate('/profile');
       return;
     }

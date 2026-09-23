@@ -53,7 +53,13 @@ function authHeaders() {
   // The bridge can finish initialising after the module has loaded. Bootstrap
   // preserves the launch value from either the bridge or the MAX URL fragment
   // so user actions do not lose their signed session after hash navigation.
-  const initData = window.WebApp?.initData?.trim() || window.KVS_MAX_INIT_DATA;
+  let cachedData = '';
+  try {
+    cachedData = window.sessionStorage.getItem('kvs-job:max-init-data') || '';
+  } catch {
+    /* Session storage can be unavailable in restricted WebViews. */
+  }
+  const initData = window.WebApp?.initData?.trim() || window.KVS_MAX_INIT_DATA || cachedData;
   return initData ? { 'X-Max-Init-Data': initData } : {};
 }
 

@@ -1,19 +1,35 @@
 let started = false;
+const MAX_INIT_DATA_SESSION_KEY = 'kvs-job:max-init-data';
+
+function launchParam(name) {
+  const hash = window.location.hash.replace(/^#/, '');
+  const fromHash = new URLSearchParams(hash).get(name);
+  if (fromHash) return fromHash;
+  return new URLSearchParams(window.location.search).get(name) || '';
+}
 
 function preserveMaxInitData() {
   const bridgeData = window.WebApp?.initData?.trim();
-  if (bridgeData) {
-    window.KVS_MAX_INIT_DATA = bridgeData;
-    return;
+  // MAX normally puts WebAppData in the fragment. Some clients preserve it in
+  // the query string during a WebView reload, so support both locations.
+  const launchData = launchParam('WebAppData').trim();
+  let cachedData = '';
+  try {
+    cachedData = window.sessionStorage.getItem(MAX_INIT_DATA_SESSION_KEY) || '';
+  } catch {
+    /* Session storage can be unavailable in restricted WebViews. */
   }
+  const initData = bridgeData || launchData || cachedData;
+  if (!initData) return;
 
-  // MAX also supplies WebAppData in the URL fragment. Save it before the
-  // single-page router replaces that fragment with a route such as #/events.
-  // The backend still validates this signed value; this only prevents a race
-  // between the bridge loading and the app starting.
-  const fragment = window.location.hash.replace(/^#/, '');
-  const fragmentData = new URLSearchParams(fragment).get('WebAppData')?.trim();
-  if (fragmentData) window.KVS_MAX_INIT_DATA = fragmentData;
+  window.KVS_MAX_INIT_DATA = initData;
+  if (bridgeData || launchData) {
+    try {
+      window.sessionStorage.setItem(MAX_INIT_DATA_SESSION_KEY, initData);
+    } catch {
+      /* The in-memory value is still sufficient for the current page. */
+    }
+  }
 }
 
 function startApplication() {
