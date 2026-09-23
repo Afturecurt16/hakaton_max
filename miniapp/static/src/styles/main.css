@@ -504,6 +504,13 @@ svg {
 .event-action-buttons .btn svg { width: 19px; height: 19px; }
 .event-link-button { flex-shrink: 0; }
 
+/* Registration is the main event-card action, so keep it on a clear full row.
+   The chat link remains a separate secondary control once a user is registered. */
+.event-action-buttons [data-action="toggle-event-registration"] {
+  width: 100%;
+  justify-content: center;
+}
+
 .btn-registered {
   background: #e7f7ee;
   color: #168653;

@@ -1,8 +1,25 @@
 let started = false;
 
+function preserveMaxInitData() {
+  const bridgeData = window.WebApp?.initData?.trim();
+  if (bridgeData) {
+    window.KVS_MAX_INIT_DATA = bridgeData;
+    return;
+  }
+
+  // MAX also supplies WebAppData in the URL fragment. Save it before the
+  // single-page router replaces that fragment with a route such as #/events.
+  // The backend still validates this signed value; this only prevents a race
+  // between the bridge loading and the app starting.
+  const fragment = window.location.hash.replace(/^#/, '');
+  const fragmentData = new URLSearchParams(fragment).get('WebAppData')?.trim();
+  if (fragmentData) window.KVS_MAX_INIT_DATA = fragmentData;
+}
+
 function startApplication() {
   if (started) return;
   started = true;
+  preserveMaxInitData();
   import('./main.js').catch((error) => {
     console.error('Failed to start KVS Job miniapp', error);
     const app = document.querySelector('#app');
@@ -29,7 +46,10 @@ if (isLocal || window.WebApp) {
   const bridge = document.createElement('script');
   bridge.src = 'https://st.max.ru/js/max-web-app.js';
   bridge.async = true;
-  bridge.addEventListener('load', startApplication, { once: true });
+  bridge.addEventListener('load', () => {
+    preserveMaxInitData();
+    startApplication();
+  }, { once: true });
   bridge.addEventListener('error', startApplication, { once: true });
   document.head.append(bridge);
 

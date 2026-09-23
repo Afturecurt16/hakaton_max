@@ -53,7 +53,7 @@ const app = document.querySelector('#app');
 const maxBridge = window.WebApp;
 const METRICS_SESSION_KEY = 'kvs-job:metrics-session';
 // Signed MAX initData is the reliable signal that the app is embedded.
-const isEmbedded = Boolean(maxBridge?.initData);
+const isEmbedded = Boolean(maxBridge?.initData || window.KVS_MAX_INIT_DATA);
 
 function metricsSessionId() {
   let value = window.localStorage.getItem(METRICS_SESSION_KEY);

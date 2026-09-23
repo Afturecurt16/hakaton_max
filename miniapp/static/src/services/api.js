@@ -45,7 +45,10 @@ async function userRequest(path, { method = 'GET' } = {}) {
 }
 
 function authHeaders() {
-  const initData = window.WebApp?.initData;
+  // The bridge can finish initialising after the module has loaded. Bootstrap
+  // preserves the launch value from either the bridge or the MAX URL fragment
+  // so user actions do not lose their signed session after hash navigation.
+  const initData = window.WebApp?.initData?.trim() || window.KVS_MAX_INIT_DATA;
   return initData ? { 'X-Max-Init-Data': initData } : {};
 }
 
