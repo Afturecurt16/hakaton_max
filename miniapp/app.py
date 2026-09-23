@@ -1030,7 +1030,13 @@ async def list_my_events(
         )
         item["registeredAt"] = registration.created_at.isoformat() if registration.created_at else ""
         items.append(item)
-    return {"items": items, "total": len(items)}
+    max_auth_status = (
+        "not_configured" if not MAX_BOT_TOKEN else
+        "missing" if not x_max_init_data else
+        "invalid" if user_id is None else
+        "verified"
+    )
+    return {"items": items, "total": len(items), "maxAuthStatus": max_auth_status}
 
 
 @app.post("/api/v1/events/{event_id}/register", status_code=201)

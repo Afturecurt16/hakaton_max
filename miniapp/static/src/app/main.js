@@ -38,6 +38,7 @@ import {
   deletePartner,
   downloadAdminMetrics,
   getAdminEvents,
+  getMyEvents,
   getSubscriptionStatus,
   registerEvent,
   sendEventMessage,
@@ -457,6 +458,22 @@ document.addEventListener('click', (e) => {
     const ok = submitProfileEmail(email);
     if (!ok) maxBridge?.HapticFeedback?.notificationOccurred?.('error');
     render().then(() => { if (!ok) document.querySelector('#profileEmail')?.focus(); });
+    if (ok) {
+      // Link an existing email-only registration immediately, including when
+      // the account opens directly into the admin panel instead of Events.
+      getMyEvents().then((data) => {
+        store.myEvents = data.items || [];
+        store.notificationsCount = Number(data.total || store.myEvents.length);
+        if (data.maxAuthStatus === 'missing')
+          showToast('MAX не передал ID. Откройте приложение через кнопку бота в MAX.', icons.link);
+        if (data.maxAuthStatus === 'invalid')
+          showToast('MAX ID не подтверждён. Перезапустите приложение; если ошибка повторится, проверьте токен бота.', icons.link);
+        if (data.maxAuthStatus === 'not_configured')
+          showToast('На сервере не настроен токен MAX-бота.', icons.link);
+      }).catch((error) => {
+        console.warn('Could not check MAX registration link', error);
+      });
+    }
   }
 
   if (action === 'logout-profile') {
