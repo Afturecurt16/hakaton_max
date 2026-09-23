@@ -20,6 +20,7 @@ export function appShell(content, { nav = false, className = '' } = {}) {
             ? 'MAX ID не подтверждён. Откройте приложение заново через бота.'
             : 'На сервере не настроен токен MAX-бота.'}</span>
         ${store.maxAppLink ? button('Открыть через MAX', { action: 'open-max-app', icon: icons.arrowUpRight }) : ''}
+        ${store.maxAuthStatus === 'missing' ? `<small class="max-connect-diagnostics">Проверка: MAX Bridge — ${window.WebApp ? 'есть' : 'нет'}; данные запуска в адресе — ${window.KVS_MAX_LAUNCH_HAS_DATA ? 'есть' : 'нет'}; данные в Bridge — ${window.WebApp?.initData ? 'есть' : 'нет'}; платформа — ${escapeHtml(window.WebApp?.platform || 'неизвестна')}.</small>` : ''}
       </aside>`
     : '';
   return `<main class="screen ${className}">${maxNotice}${content}</main>${nav ? bottomNav() : ''}`;

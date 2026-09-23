@@ -143,6 +143,7 @@ svg {
 }
 
 .max-connect-notice .btn { width: 100%; min-height: 44px; font-size: 15px; }
+.max-connect-diagnostics { color: var(--color-muted); font-size: 11px; line-height: 1.45; }
 
 /* ─── Screen header ───────────────────────────────────────────── */
 .screen-header {
