@@ -37,7 +37,6 @@ from config import (
     ADMIN_EMAIL,
     MAX_BOT_TOKEN,
     MINIAPP_DEV_ADMIN_ENABLED,
-    MINIAPP_PUBLIC_URL,
 )
 from database.db import get_session
 from database.models import (
@@ -902,12 +901,11 @@ async def _reserve_position(
     )
 
 
-def _max_event_button() -> dict | None:
-    if not MINIAPP_PUBLIC_URL:
-        return None
+def _max_event_button() -> dict:
     return {
+        "type": "open_app",
         "text": "Открыть мои мероприятия",
-        "url": f"{MINIAPP_PUBLIC_URL.split('#', 1)[0]}#/notifications",
+        "payload": "notifications",
     }
 
 

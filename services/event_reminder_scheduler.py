@@ -10,7 +10,6 @@ from sqlalchemy import select
 from config import (
     EVENT_REMINDER_POLL_SECONDS,
     EVENT_REMINDERS_ENABLED,
-    MINIAPP_PUBLIC_URL,
 )
 from database.db import async_session_maker
 from database.models import MiniappEvent, MiniappEventRegistration
@@ -24,10 +23,6 @@ def _display_timezone():
         return ZoneInfo("Europe/Moscow")
     except ZoneInfoNotFoundError:
         return timezone(timedelta(hours=3))
-
-
-def _event_url() -> str:
-    return f"{MINIAPP_PUBLIC_URL.split('#', 1)[0]}#/notifications"
 
 
 def _reminder_text(event: MiniappEvent, kind: str) -> str:
@@ -71,7 +66,7 @@ async def _send_reminders(
                 await max_bot.send_message(
                     db_registration.max_user_id,
                     _reminder_text(event, kind),
-                    button={"text": "Открыть мои события", "url": _event_url()},
+                    button={"type": "open_app", "text": "Открыть мои события", "payload": "notifications"},
                 )
             except MaxApiError as exc:
                 # A blocked bot or unavailable chat is a permanent failure for

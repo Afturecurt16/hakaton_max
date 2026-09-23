@@ -36,6 +36,14 @@ function startApplication() {
   if (started) return;
   started = true;
   preserveMaxInitData();
+  const startParam = window.WebApp?.initDataUnsafe?.start_param
+    || new URLSearchParams(window.KVS_MAX_INIT_DATA || '').get('start_param')
+    || launchParam('WebAppStartParam');
+  if (startParam === 'notifications' && !window.location.hash.startsWith('#/')) {
+    // Open the profile login first; its Events tab fetches existing
+    // registrations and links a signed MAX ID to an email-only entry.
+    window.location.hash = '/profile?tab=events';
+  }
   import('./main.js').catch((error) => {
     console.error('Failed to start KVS Job miniapp', error);
     const app = document.querySelector('#app');
