@@ -1,4 +1,5 @@
 import { categories, eventCategories, events, partners, profile, vacancies } from '../mock/data.js';
+import { store } from '../app/store.js';
 
 const API_BASE = window.KVS_API_BASE ?? '/api/v1';
 const MOCK_DELAY = 200;
@@ -53,7 +54,9 @@ function authHeaders() {
 }
 
 function adminAuthHeaders() {
-  const email = window.localStorage.getItem('kvs-job:profile-email') || '';
+  // Profile authentication is session-only, so the current email lives in
+  // the in-memory store rather than persistent localStorage.
+  const email = store.profileEmail || '';
   return { ...authHeaders(), 'X-Admin-Email': email };
 }
 
@@ -142,8 +145,14 @@ export async function getVacancy(id) {
 }
 
 export async function getEvents({ category = 'Все' } = {}) {
-  const real = await request(`/events?category=${encodeURIComponent(category)}`).catch(() => null);
-  if (real) return real;
+  try {
+    const real = await request(`/events?category=${encodeURIComponent(category)}`);
+    if (real) return real;
+  } catch (error) {
+    // Demo cards belong only to explicit mock mode. In production, surface an
+    // API outage instead of presenting stale placeholders as real events.
+    if (!canUseMockFallback()) throw error;
+  }
 
   return withMockState((forceEmpty) => ({
     categories: eventCategories,
