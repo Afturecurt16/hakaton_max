@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import re
 import sys
 import uuid
 from contextlib import suppress
@@ -168,8 +169,35 @@ async def require_miniapp_user(
 ) -> int:
     user_id = _resolve_miniapp_user(request, x_max_init_data)
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Откройте мини-приложение внутри MAX")
+        logger = logging.getLogger(__name__)
+        if not MAX_BOT_TOKEN:
+            logger.error("MAX Mini App authorization failed: MAX_BOT_TOKEN is not configured")
+            detail = "Авторизация MAX не настроена на сервере"
+        elif not x_max_init_data:
+            logger.warning("MAX Mini App authorization failed: X-Max-Init-Data is missing")
+            detail = "MAX не передал данные авторизации. Закройте и заново откройте Mini App"
+        else:
+            logger.warning(
+                "MAX Mini App authorization failed: initData signature, age, or user payload is invalid"
+            )
+            detail = (
+                "Не удалось подтвердить авторизацию MAX. Перезапустите Mini App; "
+                "если ошибка повторится, проверьте токен бота на сервере"
+            )
+        raise HTTPException(status_code=401, detail=detail)
     return user_id
+
+
+def require_profile_email(
+    x_profile_email: str = Header(default="", alias="X-Profile-Email"),
+) -> str:
+    email = x_profile_email.strip().casefold()
+    if not re.fullmatch(r"[a-z0-9._%+\-]+@edu\.fa\.ru", email):
+        raise HTTPException(
+            status_code=401,
+            detail="Нужно зарегистрироваться в профиле",
+        )
+    return email
 
 
 class EventPayload(BaseModel):
@@ -943,8 +971,10 @@ async def list_my_events(
 async def register_for_event(
     event_id: int,
     user_id: int = Depends(require_miniapp_user),
+    profile_email: str = Depends(require_profile_email),
     session: AsyncSession = Depends(get_session),
 ):
+    del profile_email
     await _require_max_subscription(user_id)
     event = (
         await session.execute(

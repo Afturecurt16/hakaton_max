@@ -414,6 +414,13 @@ document.addEventListener('click', (e) => {
 
   if (action === 'toggle-event-registration') {
     e.preventDefault();
+    if (!store.profileEmail) {
+      maxBridge?.HapticFeedback?.notificationOccurred?.('warning');
+      startProfileLogin();
+      showToast('Сначала зарегистрируйтесь в профиле', icons.user);
+      navigate('/profile');
+      return;
+    }
     const eventId = target.dataset.id;
     const isRegistered = target.dataset.registered === 'true';
     target.disabled = true;

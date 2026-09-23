@@ -46,6 +46,7 @@ export function vacancyCard(vacancy, { compact = false, index = 0 } = {}) {
 
 export function eventCard(event, index = 0, { registeredView = false } = {}) {
   const formatClass = event.format === 'Онлайн' ? 'green' : event.format === 'Гибрид' ? 'blue-solid' : 'red';
+  const needsProfile = !store.profileEmail && !event.isRegistered;
 
   // Same manage controls as the admin panel's own event list — shown right on
   // the public card so an admin browsing this tab doesn't have to separately
@@ -67,8 +68,8 @@ export function eventCard(event, index = 0, { registeredView = false } = {}) {
       ? `<p class="event-registration-status is-confirmed">${icons.check}<span>Вы зарегистрированы</span></p>`
       : '';
   const registrationButton = event.startsAt
-    ? `<button class="btn ${event.isRegistered ? 'btn-registered' : 'btn-primary'} btn-small" type="button" data-action="toggle-event-registration" data-id="${escapeHtml(event.id)}" data-registered="${event.isRegistered ? 'true' : 'false'}">
-        ${event.isRegistered ? icons.trash : icons.plus}<span>${event.isRegistered ? 'Отказаться от участия' : 'Зарегистрироваться'}</span>
+    ? `<button class="btn ${event.isRegistered ? 'btn-registered' : needsProfile ? 'btn-ghost' : 'btn-primary'} btn-small" type="button" data-action="toggle-event-registration" data-id="${escapeHtml(event.id)}" data-registered="${event.isRegistered ? 'true' : 'false'}">
+        ${event.isRegistered ? icons.trash : needsProfile ? icons.user : icons.plus}<span>${event.isRegistered ? 'Отказаться от участия' : needsProfile ? 'Нужно зарегистрироваться' : 'Зарегистрироваться'}</span>
       </button>`
     : `<button class="btn btn-ghost btn-small" type="button" disabled><span>Дата уточняется</span></button>`;
 

@@ -26,9 +26,13 @@ async function request(path) {
 }
 
 async function userRequest(path, { method = 'GET' } = {}) {
+  const profileEmail = store.profileEmail || '';
   const response = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: authHeaders(),
+    headers: {
+      ...authHeaders(),
+      ...(profileEmail ? { 'X-Profile-Email': profileEmail } : {}),
+    },
   });
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
