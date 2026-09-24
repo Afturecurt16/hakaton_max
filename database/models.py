@@ -129,8 +129,23 @@ class MiniappEventRegistration(Base):
     promoted_at = Column(DateTime(timezone=True))
     reminder_day_sent_at = Column(DateTime(timezone=True))
     reminder_two_hours_sent_at = Column(DateTime(timezone=True))
+    in_app_reminder_day_sent_at = Column(DateTime(timezone=True))
+    in_app_reminder_two_hours_sent_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     event = relationship("MiniappEvent", back_populates="registrations")
+
+
+class MiniappNotification(Base):
+    __tablename__ = "miniapp_notifications"
+
+    id = Column(Integer, primary_key=True)
+    event_id = Column(Integer, nullable=False, index=True)
+    max_user_id = Column(BigInteger, nullable=True, index=True)
+    profile_email = Column(String(320), nullable=True, index=True)
+    kind = Column(String(32), nullable=False)
+    event_title = Column(String(255), nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
 
 class MiniappAction(Base):

@@ -1,11 +1,25 @@
 import { store } from '../app/store.js';
 import { eventCard } from '../components/cards.js';
 import { icons } from '../components/icons.js';
-import { appShell, emptyState, errorState, iconButton, skeletonList, topTitle } from '../components/ui.js';
-import { getMyEvents } from '../services/api.js';
+import { appShell, button, emptyState, errorState, escapeHtml, iconButton, skeletonList, topTitle } from '../components/ui.js';
+import { getMyEvents, getMyNotifications } from '../services/api.js';
 
 function header() {
-  return topTitle('Мои события', iconButton('Назад', icons.back, { action: 'back', className: 'notifications-back' }));
+  return topTitle('Уведомления', iconButton('Назад', icons.back, { action: 'back', className: 'notifications-back' }));
+}
+
+function notificationList(items) {
+  if (!items.length) {
+    return emptyState('Пока нет уведомлений', 'Сообщения о ваших мероприятиях появятся здесь.', icons.bell);
+  }
+  return `<section class="notification-list" aria-label="Сообщения о мероприятиях">${items.map((item) => {
+    const date = new Date(item.createdAt);
+    const dateText = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
+    return `<article class="notification-card">
+      <div class="notification-card-heading"><strong>${escapeHtml(item.eventTitle)}</strong>${dateText ? `<time datetime="${escapeHtml(item.createdAt)}">${escapeHtml(dateText)}</time>` : ''}</div>
+      <p>${escapeHtml(item.text)}</p>
+    </article>`;
+  }).join('')}</section>`;
 }
 
 export function registeredEventsList(items) {
@@ -23,12 +37,21 @@ export function renderNotificationsLoading() {
 }
 
 export async function renderNotifications() {
+  if (!store.profileEmail) {
+    return appShell(`${header()}${emptyState('Войдите в профиль', 'Чтобы увидеть уведомления и свои мероприятия, сначала войдите с почтой @edu.fa.ru.', icons.bell)}${button('Войти в профиль', { action: 'navigate', route: '/profile' })}`, { className: 'notifications-screen' });
+  }
   try {
-    const data = await getMyEvents();
-    store.myEvents = data.items || [];
-    store.notificationsCount = Number(data.total || store.myEvents.length);
-    return appShell(`${header()}${registeredEventsList(store.myEvents)}`, { className: 'notifications-screen' });
+    const [notifications, events] = await Promise.all([
+      getMyNotifications(),
+      getMyEvents().catch(() => null),
+    ]);
+    if (events) store.myEvents = events.items || [];
+    store.notificationsCount = Number(notifications.total || 0);
+    const eventsContent = events
+      ? registeredEventsList(store.myEvents)
+      : errorState('Не удалось загрузить ваши мероприятия.');
+    return appShell(`${header()}${notificationList(notifications.items || [])}<h2 class="notifications-subtitle">Мои мероприятия</h2>${eventsContent}`, { className: 'notifications-screen' });
   } catch {
-    return appShell(`${header()}${errorState('Не удалось загрузить добавленные мероприятия.')}`, { className: 'notifications-screen' });
+    return appShell(`${header()}${errorState('Не удалось загрузить уведомления.')}`, { className: 'notifications-screen' });
   }
 }

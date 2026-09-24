@@ -47,6 +47,8 @@ async def init_db():
             await conn.execute(text("ALTER TABLE miniapp_event_registrations ADD COLUMN IF NOT EXISTS profile_email VARCHAR(320)"))
             await conn.execute(text("ALTER TABLE miniapp_event_registrations ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'confirmed'"))
             await conn.execute(text("ALTER TABLE miniapp_event_registrations ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE miniapp_event_registrations ADD COLUMN IF NOT EXISTS in_app_reminder_day_sent_at TIMESTAMPTZ"))
+            await conn.execute(text("ALTER TABLE miniapp_event_registrations ADD COLUMN IF NOT EXISTS in_app_reminder_two_hours_sent_at TIMESTAMPTZ"))
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_miniapp_event_registration_max ON miniapp_event_registrations (event_id, max_user_id) WHERE max_user_id IS NOT NULL"))
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_miniapp_event_registration_email ON miniapp_event_registrations (event_id, profile_email) WHERE profile_email IS NOT NULL"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_miniapp_event_registrations_status ON miniapp_event_registrations (status)"))

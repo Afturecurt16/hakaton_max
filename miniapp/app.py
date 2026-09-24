@@ -11,7 +11,6 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
-from urllib.parse import quote
 
 # This package is imported two different ways depending on how the server is
 # launched: with kvs_career_bot/ itself as the working directory (main.py's
@@ -45,6 +44,7 @@ from database.models import (
     Division,
     MiniappAction,
     MiniappEvent,
+    MiniappNotification,
     MiniappEventRegistration,
     Vacancy,
     VacancySyncState,
@@ -70,20 +70,6 @@ EVENT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="KVS Job Miniapp")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
-
-
-@app.get("/api/v1/max/app-link")
-async def max_app_link():
-    """Give the browser a native MAX launch link for the configured bot."""
-    try:
-        bot = await max_bot.request("GET", "/me")
-    except MaxApiError as exc:
-        logging.getLogger(__name__).warning("Cannot resolve MAX bot link: %s", exc)
-        raise HTTPException(status_code=503, detail="Не удалось получить ссылку на MAX-бота") from exc
-    username = str(bot.get("username") or "").lstrip("@")
-    if not username:
-        raise HTTPException(status_code=503, detail="У MAX-бота не указан username")
-    return {"url": f"https://max.ru/{quote(username, safe='')}?startapp=notifications"}
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -570,6 +556,7 @@ async def disable_static_cache(request, call_next):
     response = await call_next(request)
     if (request.url.path in {"/", "/miniapp"}
             or request.url.path.startswith("/static/src/")
+            or request.url.path.startswith("/api/v1/me/")
             or request.url.path.startswith("/assets/images/logos/")):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -918,45 +905,36 @@ async def _reserve_position(
     )
 
 
-def _max_event_button() -> dict:
-    return {
-        "type": "open_app",
-        "text": "Открыть мои мероприятия",
-        "payload": "notifications",
-    }
-
-
-async def _notify_registration(user_id: int, event: MiniappEvent, status: str) -> bool:
+def _registration_notification_text(event: MiniappEvent, status: str) -> str:
     if status == "confirmed":
-        text = f"Вы зарегистрированы на мероприятие «{event.title}». Место подтверждено."
-    else:
-        text = (
-            f"Вы в резерве на мероприятие «{event.title}». "
-            "Как только освободится место, мы сообщим вам в MAX."
-        )
-    try:
-        await max_bot.send_message(user_id, text, button=_max_event_button())
-        return True
-    except MaxApiError as exc:
-        logging.getLogger(__name__).warning(
-            "Cannot deliver MAX registration message to %s: %s", user_id, exc
-        )
-        return False
+        return f"Вы зарегистрированы на мероприятие «{event.title}». Место подтверждено."
+    return (
+        f"Вы в резерве на мероприятие «{event.title}». "
+        "Как только освободится место, мы сообщим вам здесь."
+    )
 
 
-async def _notify_promotion(user_id: int, event: MiniappEvent) -> bool:
-    try:
-        await max_bot.send_message(
-            user_id,
-            f"Освободилось место на мероприятии «{event.title}». Вы перенесены из резерва в основной список.",
-            button=_max_event_button(),
+def _add_event_notification(
+    session: AsyncSession,
+    registration: MiniappEventRegistration,
+    event: MiniappEvent,
+    kind: str,
+    text: str,
+) -> None:
+    session.add(
+        MiniappNotification(
+            event_id=event.id,
+            max_user_id=registration.max_user_id,
+            profile_email=registration.profile_email,
+            kind=kind,
+            event_title=event.title,
+            text=text,
         )
-        return True
-    except MaxApiError as exc:
-        logging.getLogger(__name__).warning(
-            "Cannot deliver MAX promotion message to %s: %s", user_id, exc
-        )
-        return False
+    )
+
+
+def _promotion_notification_text(event: MiniappEvent) -> str:
+    return f"Освободилось место на мероприятии «{event.title}». Вы перенесены из резерва в основной список."
 
 
 @app.get("/api/v1/events")
@@ -1047,13 +1025,40 @@ async def list_my_events(
         )
         item["registeredAt"] = registration.created_at.isoformat() if registration.created_at else ""
         items.append(item)
-    max_auth_status = (
-        "not_configured" if not MAX_BOT_TOKEN else
-        "missing" if not x_max_init_data else
-        "invalid" if user_id is None else
-        "verified"
-    )
-    return {"items": items, "total": len(items), "maxAuthStatus": max_auth_status}
+    return {"items": items, "total": len(items)}
+
+
+@app.get("/api/v1/me/notifications")
+async def list_my_notifications(
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    profile_email: str = Depends(require_profile_email),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
+    conditions = [MiniappNotification.profile_email == profile_email]
+    if user_id is not None:
+        conditions.append(MiniappNotification.max_user_id == user_id)
+    rows = (
+        await session.execute(
+            select(MiniappNotification)
+            .where(or_(*conditions))
+            .order_by(MiniappNotification.created_at.desc(), MiniappNotification.id.desc())
+            .limit(100)
+        )
+    ).scalars().all()
+    items = [
+        {
+            "id": notification.id,
+            "eventId": notification.event_id,
+            "eventTitle": notification.event_title,
+            "kind": notification.kind,
+            "text": notification.text,
+            "createdAt": notification.created_at.isoformat(),
+        }
+        for notification in rows
+    ]
+    return {"items": items, "total": len(items)}
 
 
 @app.post("/api/v1/events/{event_id}/register", status_code=201)
@@ -1110,13 +1115,12 @@ async def register_for_event(
             status=status,
         )
         session.add(registration)
+        await session.flush()
+        _add_event_notification(
+            session, registration, event, "registration", _registration_notification_text(event, status)
+        )
         await session.commit()
         await session.refresh(registration)
-        notification_sent = (
-            await _notify_registration(user_id, event, status)
-            if user_id is not None
-            else False
-        )
     else:
         registration_changed = False
         if registration.profile_email is None:
@@ -1127,13 +1131,11 @@ async def register_for_event(
             registration_changed = True
         if registration_changed:
             await session.commit()
-        notification_sent = True
     item = _event_to_frontend(
         event,
         registration=registration,
         reserve_position=await _reserve_position(session, registration),
     )
-    item["notificationSent"] = notification_sent
     return item
 
 
@@ -1161,7 +1163,6 @@ async def unregister_from_event(
             )
         )
     ).scalar_one_or_none()
-    promoted_user_id = None
     if registration:
         should_promote = registration.status == "confirmed"
         await session.delete(registration)
@@ -1182,10 +1183,10 @@ async def unregister_from_event(
             if promoted:
                 promoted.status = "confirmed"
                 promoted.promoted_at = datetime.now(timezone.utc)
-                promoted_user_id = promoted.max_user_id
+                _add_event_notification(
+                    session, promoted, event, "promotion", _promotion_notification_text(event)
+                )
         await session.commit()
-    if promoted_user_id:
-        await _notify_promotion(promoted_user_id, event)
     return Response(status_code=204)
 
 
@@ -1325,11 +1326,11 @@ async def admin_update_event(
         for registration in promoted:
             registration.status = "confirmed"
             registration.promoted_at = now
+            _add_event_notification(
+                session, registration, event, "promotion", _promotion_notification_text(event)
+            )
     await session.commit()
     await session.refresh(event)
-    for registration in promoted:
-        if registration.max_user_id:
-            await _notify_promotion(registration.max_user_id, event)
     reserve_count = int(
         (
             await session.execute(
@@ -1358,6 +1359,9 @@ async def admin_message_event_participants(
     event = await session.get(MiniappEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Введите текст сообщения")
     conditions = [MiniappEventRegistration.event_id == event_id]
     if payload.audience != "all":
         conditions.append(MiniappEventRegistration.status == payload.audience)
@@ -1370,35 +1374,16 @@ async def admin_message_event_participants(
             )
         ).scalars()
     )
-    recipients = list(dict.fromkeys(
-        registration.max_user_id
-        for registration in registrations
-        if registration.max_user_id is not None
-    ))
-    unavailable = sum(
-        1 for registration in registrations if registration.max_user_id is None
-    )
-    sent = 0
-    failed = 0
-    for user_id in recipients:
-        try:
-            await max_bot.send_message(
-                user_id,
-                f"Сообщение по мероприятию «{event.title}»:\n\n{payload.text.strip()}",
-                button=_max_event_button(),
-            )
-            sent += 1
-        except MaxApiError as exc:
-            failed += 1
-            logging.getLogger(__name__).warning(
-                "Cannot deliver admin MAX message to %s: %s", user_id, exc
-            )
+    recipients = [
+        registration for registration in registrations
+        if registration.profile_email or registration.max_user_id is not None
+    ]
+    for registration in recipients:
+        _add_event_notification(session, registration, event, "admin", text)
+    await session.commit()
     return {
         "total": len(registrations),
-        "deliverable": len(recipients),
-        "sent": sent,
-        "failed": failed,
-        "unavailable": unavailable,
+        "sent": len(recipients),
     }
 
 

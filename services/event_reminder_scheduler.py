@@ -5,15 +5,14 @@ import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from config import (
     EVENT_REMINDER_POLL_SECONDS,
     EVENT_REMINDERS_ENABLED,
 )
 from database.db import async_session_maker
-from database.models import MiniappEvent, MiniappEventRegistration
-from services.max_bot import MaxApiError, max_bot
+from database.models import MiniappEvent, MiniappEventRegistration, MiniappNotification
 
 logger = logging.getLogger(__name__)
 
@@ -53,42 +52,28 @@ async def _send_reminders(
 ) -> int:
     sent = 0
     marker = (
-        "reminder_day_sent_at"
+        "in_app_reminder_day_sent_at"
         if kind == "day"
-        else "reminder_two_hours_sent_at"
+        else "in_app_reminder_two_hours_sent_at"
     )
     async with async_session_maker() as session:
         for registration, event in registrations:
             db_registration = await session.get(MiniappEventRegistration, registration.id)
             if not db_registration or getattr(db_registration, marker):
                 continue
-            try:
-                await max_bot.send_message(
-                    db_registration.max_user_id,
-                    _reminder_text(event, kind),
-                    button={"type": "open_app", "text": "Открыть мои события", "payload": "notifications"},
+            session.add(
+                MiniappNotification(
+                    event_id=event.id,
+                    max_user_id=db_registration.max_user_id,
+                    profile_email=db_registration.profile_email,
+                    kind=f"reminder_{kind}",
+                    event_title=event.title,
+                    text=_reminder_text(event, kind),
                 )
-            except MaxApiError as exc:
-                # A blocked bot or unavailable chat is a permanent failure for
-                # this reminder; mark it handled to avoid retrying every minute.
-                logger.warning(
-                    "Cannot deliver %s event reminder to %s: %s",
-                    kind,
-                    db_registration.max_user_id,
-                    exc,
-                )
-                setattr(db_registration, marker, sent_at)
-            except Exception:
-                logger.exception(
-                    "Temporary failure delivering %s event reminder to %s",
-                    kind,
-                    db_registration.max_user_id,
-                )
-                continue
-            else:
-                setattr(db_registration, marker, sent_at)
-                sent += 1
+            )
+            setattr(db_registration, marker, sent_at)
             await session.commit()
+            sent += 1
     return sent
 
 
@@ -104,7 +89,10 @@ async def run_event_reminder_job(now: datetime | None = None) -> dict:
             .where(
                 MiniappEvent.is_active.is_(True),
                 MiniappEventRegistration.status == "confirmed",
-                MiniappEventRegistration.max_user_id.is_not(None),
+                or_(
+                    MiniappEventRegistration.profile_email.is_not(None),
+                    MiniappEventRegistration.max_user_id.is_not(None),
+                ),
                 MiniappEvent.starts_at.is_not(None),
                 MiniappEvent.starts_at > now,
             )
@@ -114,7 +102,7 @@ async def run_event_reminder_job(now: datetime | None = None) -> dict:
                 base.where(
                     MiniappEvent.starts_at > now + timedelta(hours=2),
                     MiniappEvent.starts_at <= now + timedelta(days=1),
-                    MiniappEventRegistration.reminder_day_sent_at.is_(None),
+                    MiniappEventRegistration.in_app_reminder_day_sent_at.is_(None),
                 )
             )
         ).all()
@@ -122,7 +110,7 @@ async def run_event_reminder_job(now: datetime | None = None) -> dict:
             await session.execute(
                 base.where(
                     MiniappEvent.starts_at <= now + timedelta(hours=2),
-                    MiniappEventRegistration.reminder_two_hours_sent_at.is_(None),
+                    MiniappEventRegistration.in_app_reminder_two_hours_sent_at.is_(None),
                 )
             )
         ).all()

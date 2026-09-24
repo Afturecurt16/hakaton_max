@@ -6,9 +6,9 @@ import { getEvents } from '../services/api.js';
 
 function notificationButton(count = store.notificationsCount) {
   return `
-    <button class="icon-btn notification-button" type="button" aria-label="Мои события" data-action="navigate" data-route="/notifications">
+    <button class="icon-btn notification-button" type="button" aria-label="Уведомления" data-action="navigate" data-route="/notifications">
       ${icons.bell}
-      <span ${count ? '' : 'hidden'}>${count}</span>
+      <span ${count ? '' : 'hidden'}>${count > 99 ? '99+' : count}</span>
     </button>`;
 }
 
@@ -26,7 +26,6 @@ export function renderEventsLoading() {
 export async function renderEvents() {
   try {
     const data = await getEvents({ category: store.filters.eventCategory });
-    store.notificationsCount = Number(data.registeredCount || 0);
     // Lets the admin's "Редактировать" button on a public event card look up
     // the full event record without a separate round trip — same list shape
     // as the admin panel's own fetch, just possibly category-filtered; the

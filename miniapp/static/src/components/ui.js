@@ -11,19 +11,7 @@ export function escapeHtml(value) {
 }
 
 export function appShell(content, { nav = false, className = '' } = {}) {
-  const needsMax = store.profileEmail && ['missing', 'invalid', 'not_configured'].includes(store.maxAuthStatus);
-  const maxNotice = needsMax && ['profile', 'events'].includes(store.route?.name)
-    ? `<aside class="max-connect-notice" role="status">
-        <span>${store.maxAuthStatus === 'missing'
-          ? 'MAX не передал ID. Уведомления о мероприятиях пока недоступны.'
-          : store.maxAuthStatus === 'invalid'
-            ? 'MAX ID не подтверждён. Откройте приложение заново через бота.'
-            : 'На сервере не настроен токен MAX-бота.'}</span>
-        ${store.maxAppLink ? button('Открыть через MAX', { action: 'open-max-app', icon: icons.arrowUpRight }) : ''}
-        ${store.maxAuthStatus === 'missing' ? `<small class="max-connect-diagnostics">Проверка: MAX Bridge — ${window.WebApp ? 'есть' : 'нет'}; данные запуска в адресе — ${window.KVS_MAX_LAUNCH_HAS_DATA ? 'есть' : 'нет'}; данные в Bridge — ${window.WebApp?.initData ? 'есть' : 'нет'}; платформа — ${escapeHtml(window.WebApp?.platform || 'неизвестна')}.</small>` : ''}
-      </aside>`
-    : '';
-  return `<main class="screen ${className}">${maxNotice}${content}</main>${nav ? bottomNav() : ''}`;
+  return `<main class="screen ${className}">${content}</main>${nav ? bottomNav() : ''}`;
 }
 
 export function button(label, { variant = 'primary', action = '', route = '', url = '', disabled = false, icon = icons.arrowRight } = {}) {

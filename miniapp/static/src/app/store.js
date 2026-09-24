@@ -74,8 +74,6 @@ export const store = {
   // MAX/WebView device.
   profileEmail: '',
   profileEmailError: '',
-  maxAuthStatus: '',
-  maxAppLink: '',
   adminMode: 'profile',
   adminSection: 'events',
   adminVacancySyncStatus: '',
@@ -129,8 +127,8 @@ export function submitProfileEmail(email) {
 
 export function logoutProfile() {
   store.profileEmail = '';
-  store.maxAuthStatus = '';
-  store.maxAppLink = '';
+  store.myEvents = [];
+  store.notificationsCount = 0;
   window.localStorage.removeItem(PROFILE_EMAIL_KEY);
   store.profileLoginMode = 'button';
   store.profileEmailError = '';

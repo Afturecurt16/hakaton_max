@@ -129,22 +129,6 @@ svg {
   animation: screen-in var(--dur-mid) var(--ease) both;
 }
 
-.max-connect-notice {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 16px;
-  border: 1px solid var(--color-divider);
-  border-radius: 16px;
-  background: var(--color-primary-soft);
-  padding: 14px;
-  color: var(--color-text);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.max-connect-notice .btn { width: 100%; min-height: 44px; font-size: 15px; }
-.max-connect-diagnostics { color: var(--color-muted); font-size: 11px; line-height: 1.45; }
-
 /* ─── Screen header ───────────────────────────────────────────── */
 .screen-header {
   display: flex;
@@ -561,6 +545,19 @@ svg {
 }
 
 .notifications-back { color: var(--color-text); }
+
+.notification-list { display: grid; gap: 10px; }
+.notification-card {
+  border: 1px solid var(--color-divider);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 14px 16px;
+}
+.notification-card-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.notification-card-heading strong { color: var(--color-text); font-size: 15px; overflow-wrap: anywhere; }
+.notification-card-heading time { color: var(--color-muted); font-size: 12px; }
+.notification-card p { margin: 10px 0 0; color: var(--color-text); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.notifications-subtitle { margin: 28px 0 12px; color: var(--color-text); font-size: 18px; }
 
 /* Admin-only edit/delete controls on a public event card — visually set apart
    from the regular "Подробнее" action below it. */

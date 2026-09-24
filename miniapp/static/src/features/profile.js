@@ -399,7 +399,7 @@ function adminEventFormSection() {
             <button class="btn btn-ghost btn-small" type="button" data-action="delete-admin-event" data-id="${escapeHtml(event.id)}">${icons.trash}<span>Удалить</span></button>
           </div>
           <details class="admin-message-panel">
-            <summary>Написать участникам в MAX</summary>
+            <summary>Написать участникам в приложении</summary>
             <label>Получатели
               <select data-event-message-audience>
                 <option value="all">Все участники</option>
@@ -408,7 +408,7 @@ function adminEventFormSection() {
               </select>
             </label>
             <textarea data-event-message-text rows="4" placeholder="Текст сообщения"></textarea>
-            <button class="btn btn-primary btn-small" type="button" data-action="send-admin-event-message" data-id="${escapeHtml(event.id)}">${icons.mail}<span>Отправить в MAX</span></button>
+            <button class="btn btn-primary btn-small" type="button" data-action="send-admin-event-message" data-id="${escapeHtml(event.id)}">${icons.mail}<span>Отправить в уведомления</span></button>
           </details>
         </article>`)}
     </section>`;
@@ -489,7 +489,6 @@ export async function renderProfile(route) {
     if (store.profileTab === 'events') {
       const data = await getMyEvents();
       store.myEvents = data.items || [];
-      store.notificationsCount = Number(data.total || store.myEvents.length);
     }
 
     const profileContent = store.profileTab === 'favorites'

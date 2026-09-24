@@ -35,16 +35,6 @@ class MaxBotClient:
     def __init__(self, token: str = MAX_BOT_TOKEN, base_url: str = MAX_API_BASE_URL):
         self.token = token
         self.base_url = base_url.rstrip("/")
-        self._bot_id: int | None = None
-
-    async def bot_id(self) -> int:
-        if self._bot_id is None:
-            bot = await self.request("GET", "/me")
-            try:
-                self._bot_id = int(bot["user_id"])
-            except (KeyError, TypeError, ValueError) as exc:
-                raise MaxApiError("MAX API did not return the bot user_id") from exc
-        return self._bot_id
 
     def _request_sync(self, method: str, path: str, *, query=None, payload=None) -> dict:
         if not self.token:
@@ -79,32 +69,6 @@ class MaxBotClient:
     async def request(self, method: str, path: str, *, query=None, payload=None) -> dict:
         return await asyncio.to_thread(
             self._request_sync, method, path, query=query, payload=payload
-        )
-
-    async def send_message(self, user_id: int, text: str, *, button=None) -> dict:
-        payload: dict = {"text": text[:4000], "notify": True}
-        if button:
-            if button.get("type") == "open_app":
-                # MAX opens the bot's configured Mini App and supplies signed
-                # WebAppData. A link button opens a regular browser tab.
-                action = {
-                    "type": "open_app",
-                    "text": button["text"],
-                    "contact_id": await self.bot_id(),
-                    "payload": button.get("payload", ""),
-                }
-            else:
-                action = {
-                    "type": "link",
-                    "text": button["text"],
-                    "url": button["url"],
-                }
-            payload["attachments"] = [{
-                "type": "inline_keyboard",
-                "payload": {"buttons": [[action]]},
-            }]
-        return await self.request(
-            "POST", "/messages", query={"user_id": int(user_id)}, payload=payload
         )
 
     async def is_channel_member(self, user_id: int) -> bool:

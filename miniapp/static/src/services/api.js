@@ -183,8 +183,8 @@ export async function getMyEvents() {
   }
 }
 
-export async function getMaxAppLink() {
-  return request('/max/app-link');
+export async function getMyNotifications() {
+  return userRequest('/me/notifications');
 }
 
 export async function registerEvent(id) {

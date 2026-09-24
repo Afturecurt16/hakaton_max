@@ -38,8 +38,8 @@ import {
   deletePartner,
   downloadAdminMetrics,
   getAdminEvents,
-  getMaxAppLink,
   getMyEvents,
+  getMyNotifications,
   getSubscriptionStatus,
   registerEvent,
   sendEventMessage,
@@ -310,6 +310,7 @@ async function render({ silent = false, transition = null } = {}) {
 
   app.innerHTML = html;
   bindInputs();
+  if (route.name === 'events' && store.profileEmail) refreshNotificationCount();
   if (!silent) window.scrollTo({ top: scrollTarget, behavior: 'instant' });
 
   if (lastTrackedRouteKey !== key) {
@@ -408,10 +409,6 @@ document.addEventListener('click', (e) => {
     const url = store.subscription.channelUrl;
     if (url) maxBridge?.openMaxLink ? maxBridge.openMaxLink(url) : window.open(url, '_blank', 'noopener');
   }
-  if (action === 'open-max-app' && store.maxAppLink) {
-    if (window.WebApp?.openMaxLink) window.WebApp.openMaxLink(store.maxAppLink);
-    else window.location.assign(store.maxAppLink);
-  }
   if (action === 'check-max-subscription') {
     target.disabled = true;
     store.subscription.checked = false;
@@ -435,7 +432,7 @@ document.addEventListener('click', (e) => {
         const message = isRegistered
           ? 'Вы отказались от участия'
           : result?.registrationStatus === 'reserve'
-            ? `Вы в резерве${result.reservePosition ? ` · позиция ${result.reservePosition}` : ''}. Как только освободится место, мы сообщим в MAX.`
+            ? `Вы в резерве${result.reservePosition ? ` · позиция ${result.reservePosition}` : ''}. Как только освободится место, мы сообщим здесь.`
             : 'Вы зарегистрированы. Место подтверждено.';
         showToast(message, isRegistered ? icons.trash : icons.check);
         if (!isRegistered) {
@@ -464,30 +461,14 @@ document.addEventListener('click', (e) => {
     if (!ok) maxBridge?.HapticFeedback?.notificationOccurred?.('error');
     render().then(() => { if (!ok) document.querySelector('#profileEmail')?.focus(); });
     if (ok) {
-      // Link an existing email-only registration immediately, including when
-      // the account opens directly into the admin panel instead of Events.
-      getMyEvents().then((data) => {
-        store.myEvents = data.items || [];
-        store.notificationsCount = Number(data.total || store.myEvents.length);
-        store.maxAuthStatus = data.maxAuthStatus || '';
-        if (data.maxAuthStatus === 'missing')
-          showToast('MAX не передал ID. Откройте приложение через кнопку бота в MAX.', icons.link);
-        if (data.maxAuthStatus === 'invalid')
-          showToast('MAX ID не подтверждён. Перезапустите приложение; если ошибка повторится, проверьте токен бота.', icons.link);
-        if (data.maxAuthStatus === 'not_configured')
-          showToast('На сервере не настроен токен MAX-бота.', icons.link);
-        if (['missing', 'invalid'].includes(data.maxAuthStatus)) {
-          getMaxAppLink().then((link) => {
-            store.maxAppLink = link?.url || '';
-          }).catch((error) => {
-            console.warn('Could not get MAX Mini App launch link', error);
-          }).finally(() => render({ silent: true }));
-        } else {
-          render({ silent: true });
-        }
-      }).catch((error) => {
-        console.warn('Could not check MAX registration link', error);
-      });
+      // Refresh the account's event list and in-app notification badge.
+      const accountEmail = store.profileEmail;
+      Promise.all([getMyEvents(), getMyNotifications()]).then(([events, notifications]) => {
+        if (store.profileEmail !== accountEmail) return;
+        store.myEvents = events.items || [];
+        store.notificationsCount = Number(notifications.total || 0);
+        render({ silent: true });
+      }).catch((error) => console.warn('Could not load account notifications', error));
     }
   }
 
@@ -732,13 +713,12 @@ document.addEventListener('click', (e) => {
       target.disabled = true;
       sendEventMessage(target.dataset.id, { text, audience })
         .then((result) => {
-          const unavailable = Number(result.unavailable || 0);
-          maxBridge?.HapticFeedback?.notificationOccurred?.(result.sent ? 'success' : 'warning');
-          const message = unavailable
-            ? `Отправлено в MAX: ${result.sent} из ${result.total}. Без MAX ID: ${unavailable}`
-            : `Отправлено в MAX: ${result.sent} из ${result.total}`;
-          showToast(message, icons.mail);
-          if (row?.querySelector('[data-event-message-text]')) row.querySelector('[data-event-message-text]').value = '';
+          const sent = Number(result.sent || 0);
+          maxBridge?.HapticFeedback?.notificationOccurred?.(sent ? 'success' : 'warning');
+          showToast(sent
+            ? `Добавлено в уведомления: ${sent} из ${result.total}`
+            : 'Для выбранной группы нет участников', icons.mail);
+          if (sent && row?.querySelector('[data-event-message-text]')) row.querySelector('[data-event-message-text]').value = '';
           target.disabled = false;
         })
         .catch((error) => {
@@ -837,10 +817,33 @@ window.addEventListener('kvs:max-data-ready', () => {
   if (!store.profileEmail) return;
   getMyEvents().then((data) => {
     store.myEvents = data.items || [];
-    store.notificationsCount = Number(data.total || store.myEvents.length);
-    store.maxAuthStatus = data.maxAuthStatus || '';
-    if (data.maxAuthStatus === 'verified') store.maxAppLink = '';
     render({ silent: true });
   }).catch((error) => console.warn('Could not refresh MAX identity', error));
+});
+
+let notificationCountLoading = false;
+async function refreshNotificationCount() {
+  if (document.hidden || !store.profileEmail) return;
+  if (notificationCountLoading) return;
+  notificationCountLoading = true;
+  const email = store.profileEmail;
+  try {
+    const data = await getMyNotifications();
+    if (store.profileEmail !== email) return;
+    const count = Number(data.total || 0);
+    if (count !== store.notificationsCount) {
+      store.notificationsCount = count;
+      if (['events', 'notifications'].includes(store.route?.name)) render({ silent: true });
+    }
+  } catch {
+    // Keep the last count; opening the inbox will show a loading error if needed.
+  } finally {
+    notificationCountLoading = false;
+  }
+}
+
+window.setInterval(refreshNotificationCount, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshNotificationCount();
 });
 render();

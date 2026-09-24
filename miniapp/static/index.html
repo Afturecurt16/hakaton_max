@@ -22,7 +22,6 @@
       (function () {
         var data = new URLSearchParams(window.location.hash.slice(1)).get('WebAppData')
           || new URLSearchParams(window.location.search).get('WebAppData');
-        window.KVS_MAX_LAUNCH_HAS_DATA = Boolean(data);
         if (!data) return;
         window.KVS_MAX_INIT_DATA = data;
         try { window.sessionStorage.setItem('kvs-job:max-init-data', data); } catch (_) {}
