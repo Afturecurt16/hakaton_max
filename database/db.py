@@ -1,4 +1,5 @@
 import sys
+import time
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import select, text
@@ -26,6 +27,7 @@ async def get_session():
 async def init_db():
     """Create missing tables and optionally seed demo data."""
     from database.models import Base
+    started_at = time.monotonic()
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -53,16 +55,16 @@ async def init_db():
             await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_miniapp_event_registration_email ON miniapp_event_registrations (event_id, profile_email) WHERE profile_email IS NOT NULL"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_miniapp_event_registrations_status ON miniapp_event_registrations (status)"))
             await conn.execute(text("ALTER TABLE miniapp_actions ADD COLUMN IF NOT EXISTS max_user_id BIGINT"))
+            await conn.execute(text("ALTER TABLE miniapp_notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_miniapp_actions_max_user_id ON miniapp_actions (max_user_id)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_miniapp_events_starts_at ON miniapp_events (starts_at)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_companies_is_partner ON companies (is_partner)"))
-        _safe_print("✅ Таблицы базы данных успешно созданы/проверены")
-        
         if SEED_DEMO_DATA:
             await seed_demo_data()
         await seed_kept_partner()
         await seed_vk_partner()
         await seed_vk_ecosystem_partners()
+        _safe_print(f"✅ База данных готова за {time.monotonic() - started_at:.1f} с")
     except Exception as e:
         _safe_print(f"❌ Ошибка при создании таблиц: {e}")
         raise

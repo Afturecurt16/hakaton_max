@@ -31,6 +31,7 @@ Write-Host "Checking database..." -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to initialize database"
 }
+$env:KVS_DB_INITIALIZED = "1"
 
 Write-Host "Miniapp: $url" -ForegroundColor Green
 Write-Host "Press Ctrl+C to stop" -ForegroundColor DarkGray

@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
 import re
 import sys
 import uuid
@@ -28,7 +29,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -84,13 +85,10 @@ async def database_error_handler(request, exc: Exception):
 
 @app.on_event("startup")
 async def _ensure_db_ready() -> None:
-    # main.py's bot startup already calls this before launching the miniapp
-    # server task, but init_db() is idempotent (CREATE TABLE IF NOT EXISTS)
-    # — calling it here too means the miniapp also works if it's ever run
-    # standalone (as in local testing), without depending on that ordering.
-    #
-    # The sync itself is deliberately not part of startup. It runs in a
-    # background task below so a slow Google request cannot delay the UI.
+    # The container/local launcher has already migrated and seeded the DB.
+    # Standalone Uvicorn still initialises it here.
+    if os.getenv("KVS_DB_INITIALIZED") == "1":
+        return
     from database.db import init_db
 
     try:
@@ -1036,13 +1034,11 @@ async def list_my_notifications(
     session: AsyncSession = Depends(get_session),
 ):
     user_id = _resolve_miniapp_user(request, x_max_init_data)
-    conditions = [MiniappNotification.profile_email == profile_email]
-    if user_id is not None:
-        conditions.append(MiniappNotification.max_user_id == user_id)
+    owner_filter = _notification_owner_filter(profile_email, user_id)
     rows = (
         await session.execute(
             select(MiniappNotification)
-            .where(or_(*conditions))
+            .where(owner_filter)
             .order_by(MiniappNotification.created_at.desc(), MiniappNotification.id.desc())
             .limit(100)
         )
@@ -1055,10 +1051,61 @@ async def list_my_notifications(
             "kind": notification.kind,
             "text": notification.text,
             "createdAt": notification.created_at.isoformat(),
+            "readAt": notification.read_at.isoformat() if notification.read_at else None,
         }
         for notification in rows
     ]
-    return {"items": items, "total": len(items)}
+    return {"items": items, "total": len(items), "unreadCount": await _unread_notification_count(session, owner_filter)}
+
+
+def _notification_owner_filter(profile_email: str, user_id: int | None):
+    conditions = [MiniappNotification.profile_email == profile_email]
+    if user_id is not None:
+        conditions.append(MiniappNotification.max_user_id == user_id)
+    return or_(*conditions)
+
+
+async def _unread_notification_count(session: AsyncSession, owner_filter) -> int:
+    return int((await session.scalar(
+        select(func.count(MiniappNotification.id)).where(
+            owner_filter, MiniappNotification.read_at.is_(None),
+        )
+    )) or 0)
+
+
+@app.get("/api/v1/me/notifications/unread-count")
+async def unread_notification_count(
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    profile_email: str = Depends(require_profile_email),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
+    owner_filter = _notification_owner_filter(profile_email, user_id)
+    return {"unreadCount": await _unread_notification_count(session, owner_filter)}
+
+
+class MarkNotificationsReadRequest(BaseModel):
+    through_id: int = Field(gt=0, alias="throughId")
+
+
+@app.post("/api/v1/me/notifications/read")
+async def mark_my_notifications_read(
+    body: MarkNotificationsReadRequest,
+    request: Request,
+    x_max_init_data: str = Header(default="", alias="X-Max-Init-Data"),
+    profile_email: str = Depends(require_profile_email),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = _resolve_miniapp_user(request, x_max_init_data)
+    owner_filter = _notification_owner_filter(profile_email, user_id)
+    await session.execute(
+        update(MiniappNotification)
+        .where(owner_filter, MiniappNotification.id <= body.through_id, MiniappNotification.read_at.is_(None))
+        .values(read_at=datetime.now(timezone.utc))
+    )
+    await session.commit()
+    return {"unreadCount": await _unread_notification_count(session, owner_filter)}
 
 
 @app.post("/api/v1/events/{event_id}/register", status_code=201)

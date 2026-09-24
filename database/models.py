@@ -146,6 +146,7 @@ class MiniappNotification(Base):
     event_title = Column(String(255), nullable=False)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class MiniappAction(Base):

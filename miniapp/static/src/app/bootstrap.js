@@ -78,11 +78,12 @@ if (isLocal || window.WebApp) {
   bridge.async = true;
   bridge.addEventListener('load', () => {
     preserveMaxInitData();
+    window.dispatchEvent(new Event('kvs:max-bridge-ready'));
     startApplication();
   }, { once: true });
   bridge.addEventListener('error', startApplication, { once: true });
   document.head.append(bridge);
 
   // A temporary MAX CDN failure must never leave the user on a blank screen.
-  window.setTimeout(startApplication, 3000);
+  window.setTimeout(startApplication, 700);
 }

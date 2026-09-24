@@ -25,10 +25,11 @@ async function request(path) {
   return response.json();
 }
 
-async function userRequest(path, { method = 'GET' } = {}) {
+async function userRequest(path, { method = 'GET', body } = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: profileAuthHeaders(),
+    headers: { ...profileAuthHeaders(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
@@ -185,6 +186,14 @@ export async function getMyEvents() {
 
 export async function getMyNotifications() {
   return userRequest('/me/notifications');
+}
+
+export async function getUnreadNotificationCount() {
+  return userRequest('/me/notifications/unread-count');
+}
+
+export async function markMyNotificationsRead(throughId) {
+  return userRequest('/me/notifications/read', { method: 'POST', body: { throughId } });
 }
 
 export async function registerEvent(id) {

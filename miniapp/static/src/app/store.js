@@ -88,6 +88,7 @@ export const store = {
   subscription: { checked: false, required: false, subscribed: true, channelUrl: '', error: '' },
   myEvents: [],
   notificationsCount: 0,
+  notificationsThroughId: 0,
   adminPartners: [],
   adminPartnerDraft: emptyPartnerDraft(),
   adminPartnerEditingId: null,
@@ -129,6 +130,7 @@ export function logoutProfile() {
   store.profileEmail = '';
   store.myEvents = [];
   store.notificationsCount = 0;
+  store.notificationsThroughId = 0;
   window.localStorage.removeItem(PROFILE_EMAIL_KEY);
   store.profileLoginMode = 'button';
   store.profileEmailError = '';

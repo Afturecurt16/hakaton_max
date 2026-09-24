@@ -39,8 +39,9 @@ import {
   downloadAdminMetrics,
   getAdminEvents,
   getMyEvents,
-  getMyNotifications,
+  getUnreadNotificationCount,
   getSubscriptionStatus,
+  markMyNotificationsRead,
   registerEvent,
   sendEventMessage,
   syncAdminVacancies,
@@ -52,10 +53,10 @@ import {
 } from '../services/api.js';
 
 const app = document.querySelector('#app');
-const maxBridge = window.WebApp;
+let maxBridge = window.WebApp || {};
 const METRICS_SESSION_KEY = 'kvs-job:metrics-session';
 // Signed MAX initData is the reliable signal that the app is embedded.
-const isEmbedded = Boolean(maxBridge?.initData || window.KVS_MAX_INIT_DATA);
+let isEmbedded = Boolean(maxBridge?.initData || window.KVS_MAX_INIT_DATA);
 
 function metricsSessionId() {
   let value = window.localStorage.getItem(METRICS_SESSION_KEY);
@@ -106,6 +107,21 @@ if (isEmbedded) {
 } else {
   window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(resolveScheme()));
 }
+window.addEventListener('kvs:max-bridge-ready', () => {
+  const wasEmbedded = isEmbedded;
+  maxBridge = window.WebApp || {};
+  isEmbedded = Boolean(maxBridge.initData || window.KVS_MAX_INIT_DATA);
+  maxBridge.ready?.();
+  maxBridge.expand?.();
+  maxBridge.disableVerticalSwipes?.();
+  if (isEmbedded) {
+    maxBridge.onEvent?.('themeChanged', () => applyTheme(resolveScheme()));
+    maxBridge.BackButton?.onClick(goBack);
+    if (store.route) syncBackButton(store.route);
+  }
+  applyTheme(resolveScheme());
+  if (!wasEmbedded && isEmbedded && !store.subscription.checked) render({ silent: true });
+});
 
 function haptic(type = 'light') {
   maxBridge?.HapticFeedback?.impactOccurred(type);
@@ -231,6 +247,13 @@ function updateFavoriteCounters() {
   });
 }
 
+function updateNotificationBadge() {
+  const badge = document.querySelector('.notification-button span');
+  if (!badge) return;
+  badge.textContent = store.notificationsCount > 99 ? '99+' : String(store.notificationsCount);
+  badge.hidden = store.notificationsCount === 0;
+}
+
 function loadingFor(route) {
   if (route.name === 'partners') return renderPartnersLoading();
   if (route.name === 'partner-detail' || route.name === 'department-detail') return renderPartnerDetailLoading();
@@ -310,6 +333,15 @@ async function render({ silent = false, transition = null } = {}) {
 
   app.innerHTML = html;
   bindInputs();
+  if (route.name === 'notifications' && store.profileEmail && store.notificationsThroughId) {
+    const accountEmail = store.profileEmail;
+    const throughId = store.notificationsThroughId;
+    markMyNotificationsRead(throughId).then((data) => {
+      if (store.profileEmail !== accountEmail) return;
+      store.notificationsCount = Number(data.unreadCount || 0);
+      updateNotificationBadge();
+    }).catch((error) => console.warn('Could not mark notifications as read', error));
+  }
   if (route.name === 'events' && store.profileEmail) refreshNotificationCount();
   if (!silent) window.scrollTo({ top: scrollTarget, behavior: 'instant' });
 
@@ -463,10 +495,10 @@ document.addEventListener('click', (e) => {
     if (ok) {
       // Refresh the account's event list and in-app notification badge.
       const accountEmail = store.profileEmail;
-      Promise.all([getMyEvents(), getMyNotifications()]).then(([events, notifications]) => {
+      Promise.all([getMyEvents(), getUnreadNotificationCount()]).then(([events, notifications]) => {
         if (store.profileEmail !== accountEmail) return;
         store.myEvents = events.items || [];
-        store.notificationsCount = Number(notifications.total || 0);
+        store.notificationsCount = Number(notifications.unreadCount || 0);
         render({ silent: true });
       }).catch((error) => console.warn('Could not load account notifications', error));
     }
@@ -828,9 +860,9 @@ async function refreshNotificationCount() {
   notificationCountLoading = true;
   const email = store.profileEmail;
   try {
-    const data = await getMyNotifications();
+    const data = await getUnreadNotificationCount();
     if (store.profileEmail !== email) return;
-    const count = Number(data.total || 0);
+    const count = Number(data.unreadCount || 0);
     if (count !== store.notificationsCount) {
       store.notificationsCount = count;
       if (['events', 'notifications'].includes(store.route?.name)) render({ silent: true });
