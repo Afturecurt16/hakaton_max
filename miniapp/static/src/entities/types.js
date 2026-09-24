@@ -46,7 +46,7 @@
  * @property {boolean} [isRegistered]
  *
  * @typedef {Object} Profile
- * @property {string} name
+ * @property {string} email
  * @property {string} faculty
  * @property {string} course
  * @property {string} group

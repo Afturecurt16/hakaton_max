@@ -1,4 +1,4 @@
-import { companyLogo, departmentLogo } from '../components/cards.js';
+import { companyLogo } from '../components/cards.js';
 import { icons } from '../components/icons.js';
 import { appShell, emptyState, errorState, escapeHtml, iconButton, skeletonList, topTitle } from '../components/ui.js';
 import { getPartner, getPartnerDepartment, getPartners } from '../services/api.js';
@@ -37,7 +37,6 @@ function childCompanyCard(parentId, company, index) {
 function departmentCard(partnerId, department, index) {
   return `
     <article class="department-card" style="--i:${index}">
-      ${departmentLogo(department.name)}
       <div>
         <h3>${escapeHtml(department.name)}</h3>
         <p>${escapeHtml(department.description)}</p>
@@ -124,7 +123,6 @@ export async function renderDepartmentDetail(partnerId, departmentId) {
         <span>${escapeHtml(department.companyName)}</span>
       </header>
       <article class="department-detail-identity">
-        ${departmentLogo(department.name, 'large')}
         <p>${escapeHtml(department.companyName)}</p>
         <h1>${escapeHtml(department.name)}</h1>
       </article>

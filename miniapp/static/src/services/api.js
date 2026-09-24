@@ -1,4 +1,4 @@
-import { categories, eventCategories, events, partners, profile, vacancies } from '../mock/data.js';
+import { categories, eventCategories, events, partners, vacancies } from '../mock/data.js';
 import { store } from '../app/store.js';
 
 const API_BASE = window.KVS_API_BASE ?? '/api/v1';
@@ -209,10 +209,11 @@ export async function getSubscriptionStatus() {
 }
 
 export async function getProfile() {
-  const real = await request('/profile').catch(() => null);
-  if (real) return real;
+  return userRequest('/me/profile');
+}
 
-  return withMockState((forceEmpty) => (forceEmpty ? null : profile));
+export async function updateProfile(fields) {
+  return userRequest('/me/profile', { method: 'PUT', body: fields });
 }
 
 export async function getPartners() {

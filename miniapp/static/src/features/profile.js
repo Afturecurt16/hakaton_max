@@ -57,7 +57,8 @@ function loginGateView() {
 }
 
 function resumeView(profile) {
-  const pendingValue = 'Данные загружаются';
+  const pendingValue = 'Не указано';
+  const draft = store.profileDraft;
 
   return `
     ${isAdminProfile() ? `<section class="admin-entry">${button('Панель разработчика', { variant: 'primary', action: 'admin-mode', route: 'panel', icon: icons.sparkle })}</section>` : ''}
@@ -65,14 +66,18 @@ function resumeView(profile) {
     <section class="profile-head">
       <span class="avatar">${icons.user}</span>
       <div>
-        <h2>${escapeHtml(profile.name)}</h2>
-        <p>Данные студента</p>
+        <h2>Мой профиль</h2>
+        <p>${escapeHtml(profile.email)}</p>
       </div>
     </section>
 
     <section class="student-info-card" aria-labelledby="studentInfoTitle">
       <h3 id="studentInfoTitle">Обучение</h3>
       <dl class="student-info-list">
+        <div>
+          <dt>Почта</dt>
+          <dd>${escapeHtml(profile.email)}</dd>
+        </div>
         <div>
           <dt>Факультет</dt>
           <dd>${escapeHtml(profile.faculty || pendingValue)}</dd>
@@ -86,6 +91,19 @@ function resumeView(profile) {
           <dd>${escapeHtml(profile.group || pendingValue)}</dd>
         </div>
       </dl>
+      ${store.profileEditing ? `
+        <div class="student-profile-form">
+          <p class="student-profile-hint">Почта привязана к входу и здесь не меняется.</p>
+          <label for="studentFaculty">Факультет</label>
+          <input id="studentFaculty" type="text" maxlength="120" autocomplete="organization" placeholder="Укажи факультет" value="${escapeHtml(draft.faculty)}" />
+          <label for="studentCourse">Курс</label>
+          <input id="studentCourse" type="text" maxlength="32" placeholder="Например, 3 курс" value="${escapeHtml(draft.course)}" />
+          <label for="studentGroup">Группа</label>
+          <input id="studentGroup" type="text" maxlength="80" placeholder="Укажи группу" value="${escapeHtml(draft.group)}" />
+          ${store.profileEditError ? `<p class="form-error" role="alert">${escapeHtml(store.profileEditError)}</p>` : ''}
+          ${button('Сохранить', { variant: 'primary', action: 'save-student-profile', icon: icons.check })}
+          ${button('Отмена', { variant: 'ghost', action: 'cancel-student-profile-edit' })}
+        </div>` : `<div class="student-profile-edit">${button('Редактировать профиль', { variant: 'ghost', action: 'edit-student-profile' })}</div>`}
     </section>
 
     <section class="profile-actions">
@@ -476,15 +494,8 @@ export async function renderProfile(route) {
   }
 
   try {
-    const loadedProfile = await getProfile();
-    const profile = loadedProfile ? { ...loadedProfile, email: store.profileEmail } : null;
-
-    if (!profile) {
-      return appShell(
-        `${topTitle('Мой профиль')}${emptyState('Профиль не найден', 'Данные об обучении пока недоступны. Попробуй открыть профиль позже.')}`,
-        { nav: true },
-      );
-    }
+    const profile = store.profileData || await getProfile();
+    if (store.profileEmail === profile.email) store.profileData = profile;
 
     if (store.profileTab === 'events') {
       const data = await getMyEvents();

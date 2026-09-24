@@ -356,10 +356,3 @@ export const events = [
     url: 'https://example.com/events/case-championship',
   },
 ];
-
-export const profile = {
-  name: 'Профиль студента',
-  faculty: 'ИТиАБД',
-  course: '3 курс',
-  group: 'ПИ23-1',
-};

@@ -74,6 +74,10 @@ export const store = {
   // MAX/WebView device.
   profileEmail: '',
   profileEmailError: '',
+  profileData: null,
+  profileEditing: false,
+  profileEditError: '',
+  profileDraft: { faculty: '', course: '', group: '' },
   adminMode: 'profile',
   adminSection: 'events',
   adminVacancySyncStatus: '',
@@ -119,6 +123,9 @@ export function submitProfileEmail(email) {
     return false;
   }
   store.profileEmail = normalized;
+  store.profileData = null;
+  store.profileEditing = false;
+  store.profileEditError = '';
   store.favorites = readFavorites(normalized);
   store.profileEmailError = '';
   store.profileLoginMode = 'button';
@@ -128,6 +135,9 @@ export function submitProfileEmail(email) {
 
 export function logoutProfile() {
   store.profileEmail = '';
+  store.profileData = null;
+  store.profileEditing = false;
+  store.profileEditError = '';
   store.myEvents = [];
   store.notificationsCount = 0;
   store.notificationsThroughId = 0;

@@ -280,7 +280,6 @@ svg {
 .vacancy-card,
 .event-card,
 .state-card,
-.resume-summary,
 .student-info-card,
 .content-section,
 .login-card {
@@ -352,8 +351,6 @@ svg {
 
 .company-logo-mark { font-size: 18px; letter-spacing: -.04em; }
 .company-logo-mark.large { font-size: 25px; }
-.department-card .department-logo { width: 38px; height: 38px; border-radius: 11px; font-size: 13px; }
-.department-detail-identity .department-logo.large { width: 76px; height: 76px; }
 
 .vacancy-info { min-width: 0; }
 
@@ -644,9 +641,7 @@ svg {
   line-height: 1.15;
 }
 
-.event-meta,
-.contact,
-.muted-line {
+.event-meta {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -655,9 +650,7 @@ svg {
 
 .event-meta { margin: 8px 0; font-size: 17px; }
 
-.event-meta svg,
-.contact svg,
-.muted-line svg { width: 20px; height: 20px; flex-shrink: 0; }
+.event-meta svg { width: 20px; height: 20px; flex-shrink: 0; }
 
 .deadline {
   border-radius: 14px;
@@ -819,9 +812,30 @@ svg {
   overflow-wrap: anywhere;
 }
 
-.resume-summary { border-radius: 22px; margin-bottom: 14px; padding: 16px 18px; }
+.student-profile-edit { padding: 8px 0 18px; }
+.student-profile-edit .btn { width: 100%; }
 
-.contact { margin: 16px 0 0; font-size: 19px; gap: 10px; }
+.student-profile-form {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--color-divider);
+  padding: 18px 0;
+}
+
+.student-profile-hint { margin: 0 0 4px; color: var(--color-muted); font-size: 14px; }
+.student-profile-form label { color: var(--color-muted); font-size: 15px; font-weight: 700; }
+.student-profile-form input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--color-divider);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0 14px;
+  font: inherit;
+}
+.student-profile-form input:focus { border-color: var(--color-primary); outline: 0; }
+.student-profile-form .btn { width: 100%; }
 
 /* ─── Content sections ────────────────────────────────────────── */
 .content-section {
@@ -1483,7 +1497,7 @@ svg {
 .department-card {
   position: relative;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  grid-template-columns: minmax(0, 1fr) 22px;
   gap: 12px;
   align-items: start;
   overflow: hidden;
@@ -1494,7 +1508,6 @@ svg {
   animation-delay: calc(var(--i, 0) * 38ms);
 }
 
-.department-number { color: var(--color-primary); font-size: 16px; font-weight: 900; }
 .department-card h3 { margin: 0 0 7px; font-size: 18px; line-height: 1.2; }
 
 .department-card p {
@@ -1513,7 +1526,6 @@ svg {
 .department-card-hit { inset: 0; }
 .muted-copy { color: var(--color-muted); }
 
-.department-detail-identity .company-logo { margin: 0 auto 10px; }
 .department-detail-identity > p { margin: 0 0 6px; color: var(--color-primary); font-weight: 800; }
 
 .department-detail-identity h1 {

@@ -149,6 +149,16 @@ class MiniappNotification(Base):
     read_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class StudentProfile(Base):
+    __tablename__ = "student_profiles"
+
+    email = Column(String(320), primary_key=True)
+    faculty = Column(String(120), nullable=False, default="")
+    course = Column(String(32), nullable=False, default="")
+    group = Column(String(80), nullable=False, default="")
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 class MiniappAction(Base):
     __tablename__ = "miniapp_actions"
 

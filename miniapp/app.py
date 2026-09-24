@@ -47,6 +47,7 @@ from database.models import (
     MiniappEvent,
     MiniappNotification,
     MiniappEventRegistration,
+    StudentProfile,
     Vacancy,
     VacancySyncState,
 )
@@ -559,14 +560,6 @@ async def disable_static_cache(request, call_next):
         response.headers["Cache-Control"] = "no-store"
     return response
 
-DEFAULT_PROFILE = {
-    "name": "Профиль студента",
-    # Temporary values until the university profile service is connected.
-    "faculty": "ИТиАБД",
-    "course": "3 курс",
-    "group": "ПИ23-1",
-}
-
 @app.get("/")
 @app.get("/miniapp")
 async def index():
@@ -589,10 +582,45 @@ async def bootstrap():
     }
 
 
-@app.get("/api/v1/profile")
-async def get_profile():
-    """Return a temporary profile contract until the MAX profile is connected."""
-    return DEFAULT_PROFILE
+def _profile_to_frontend(profile: StudentProfile | None, email: str) -> dict:
+    return {
+        "email": email,
+        "faculty": profile.faculty if profile else "",
+        "course": profile.course if profile else "",
+        "group": profile.group if profile else "",
+    }
+
+
+@app.get("/api/v1/me/profile")
+async def get_profile(
+    profile_email: str = Depends(require_profile_email),
+    session: AsyncSession = Depends(get_session),
+):
+    profile = await session.get(StudentProfile, profile_email)
+    return _profile_to_frontend(profile, profile_email)
+
+
+class StudentProfileUpdate(BaseModel):
+    faculty: str = Field(default="", max_length=120)
+    course: str = Field(default="", max_length=32)
+    group: str = Field(default="", max_length=80)
+
+
+@app.put("/api/v1/me/profile")
+async def update_profile(
+    body: StudentProfileUpdate,
+    profile_email: str = Depends(require_profile_email),
+    session: AsyncSession = Depends(get_session),
+):
+    profile = await session.get(StudentProfile, profile_email)
+    if profile is None:
+        profile = StudentProfile(email=profile_email)
+        session.add(profile)
+    profile.faculty = body.faculty.strip()
+    profile.course = body.course.strip()
+    profile.group = body.group.strip()
+    await session.commit()
+    return _profile_to_frontend(profile, profile_email)
 
 
 @app.post("/api/v1/metrics/actions", status_code=204)

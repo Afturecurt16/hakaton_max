@@ -20,15 +20,6 @@ function textMark(text, color, size = '', extraClass = '') {
   return `<span class="company-logo company-logo-mark ${extraClass} ${size}" style="--brand:${color}" aria-hidden="true">${escapeHtml(text)}</span>`;
 }
 
-export function departmentLogo(name, size = '') {
-  const value = String(name || '').trim();
-  const words = value.split(/\s+/).filter(Boolean);
-  const initials = (words.length > 1 ? words[0][0] + words[1][0] : value.slice(0, 2)).toUpperCase() || 'Д';
-  const colors = ['#3268c5', '#8054bb', '#16847c', '#b85b42', '#ad667f', '#5567aa'];
-  const hash = Array.from(value).reduce((sum, char) => sum + char.codePointAt(0), 0);
-  return textMark(initials, colors[hash % colors.length], size, 'department-logo');
-}
-
 export function companyLogo(company, size = '') {
   const productMark = company.logoUrl === '/assets/images/logos/vk.svg' && vkProductMarks[company.name];
   if (productMark) return textMark(productMark[0], productMark[1], size, 'vk-product-logo');

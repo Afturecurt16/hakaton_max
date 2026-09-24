@@ -50,6 +50,7 @@ import {
   uploadEventImage,
   updateEvent,
   updatePartner,
+  updateProfile,
 } from '../services/api.js';
 
 const app = document.querySelector('#app');
@@ -507,6 +508,46 @@ document.addEventListener('click', (e) => {
   if (action === 'logout-profile') {
     logoutProfile();
     render();
+  }
+
+  if (action === 'edit-student-profile') {
+    const profile = store.profileData || {};
+    store.profileDraft = {
+      faculty: profile.faculty || '',
+      course: profile.course || '',
+      group: profile.group || '',
+    };
+    store.profileEditError = '';
+    store.profileEditing = true;
+    render({ silent: true });
+  }
+
+  if (action === 'cancel-student-profile-edit') {
+    store.profileEditing = false;
+    store.profileEditError = '';
+    render({ silent: true });
+  }
+
+  if (action === 'save-student-profile') {
+    const accountEmail = store.profileEmail;
+    store.profileDraft = {
+      faculty: document.querySelector('#studentFaculty')?.value.trim() || '',
+      course: document.querySelector('#studentCourse')?.value.trim() || '',
+      group: document.querySelector('#studentGroup')?.value.trim() || '',
+    };
+    target.disabled = true;
+    updateProfile(store.profileDraft).then((profile) => {
+      if (store.profileEmail !== accountEmail) return;
+      store.profileData = profile;
+      store.profileEditing = false;
+      store.profileEditError = '';
+      showToast('Профиль сохранён', icons.check);
+      render({ silent: true });
+    }).catch((error) => {
+      if (store.profileEmail !== accountEmail) return;
+      store.profileEditError = error.message || 'Не удалось сохранить профиль';
+      render({ silent: true });
+    });
   }
 
   if (action === 'admin-mode') {
